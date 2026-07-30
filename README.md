@@ -1,0 +1,2 @@
+# PalBoard
+Palworld Dashboard
