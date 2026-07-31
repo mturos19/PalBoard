@@ -1,0 +1,19 @@
+node_modules/
+out/
+release/
+dist/
+
+# Screenshots produced by tools/drive.mjs
+shots/
+
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Never commit save data — it contains player names and world state.
+*.sav

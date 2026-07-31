@@ -1,0 +1,64 @@
+{
+  "name": "palboard",
+  "version": "0.1.0",
+  "description": "A real-time dashboard for Palworld that reads local save files",
+  "main": "./out/main/index.js",
+  "author": "PalBoard",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "_comment_type": "Intentionally NOT \"type\": \"module\". Electron's main-process ESM loader cannot resolve named exports from the `electron` CJS shim, so main and preload are built as CommonJS. The renderer is bundled by Vite and is unaffected.",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "start": "electron .",
+    "preview": "electron-vite preview",
+    "drive": "node tools/drive.mjs",
+    "verify": "vite-node tools/verify.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dist": "npm run build && electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "ooz-wasm": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.12",
+    "@types/node": "^22.16.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^37.2.4",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.0",
+    "lucide-react": "^0.526.0",
+    "playwright": "^1.62.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.7.1",
+    "recharts": "^2.15.4",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.6",
+    "vitest": "^3.2.4",
+    "zustand": "^5.0.6"
+  },
+  "build": {
+    "appId": "dev.palboard.app",
+    "productName": "PalBoard",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
