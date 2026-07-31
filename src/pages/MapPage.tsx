@@ -120,45 +120,58 @@ export function MapPage() {
       >
         {gridLines}
 
-        {/* Base influence areas + markers. Labels alternate above/below the
-            marker so bases built next to each other stay readable. */}
-        {bases.map((base, i) => {
-          const p = toScreen(base.coord.x, base.coord.y, size.w, size.h)
-          const radius = (base.areaRange / WORLD_PER_MAP) * v.scale
-          const below = i % 2 === 1
-          const ty = below ? p.y + 22 : p.y - 20
+        {/* Base influence areas + markers. Labels are placed greedily: sorted
+            by screen y, each one is pushed down until it no longer overlaps
+            the previous label, so adjacent bases stay readable at any zoom. */}
+        {(() => {
+          const LABEL_H = 30
+          const placed = bases
+            .map((base) => {
+              const p = toScreen(base.coord.x, base.coord.y, size.w, size.h)
+              return { base, p, ty: p.y - 18 }
+            })
+            .sort((a, b) => a.p.y - b.p.y)
+          for (let i = 1; i < placed.length; i++) {
+            const prev = placed[i - 1]
+            const cur = placed[i]
+            // Only labels in the same horizontal band can collide.
+            if (Math.abs(cur.p.x - prev.p.x) < 240 && cur.ty < prev.ty + LABEL_H) {
+              cur.ty = prev.ty + LABEL_H
+            }
+          }
+          return placed.map(({ base, p, ty }) => {
+            const radius = (base.areaRange / WORLD_PER_MAP) * v.scale
+            return (
+              <g key={base.id}>
+                <circle cx={p.x} cy={p.y} r={radius} fill="var(--color-accent)" opacity={0.07} />
+                <circle cx={p.x} cy={p.y} r={radius} fill="none" stroke="var(--color-accent)" strokeOpacity={0.35} strokeDasharray="4 4" />
+                <circle cx={p.x} cy={p.y} r={5} fill="var(--color-accent)" />
+                <circle cx={p.x} cy={p.y} r={9} fill="none" stroke="var(--color-accent)" strokeOpacity={0.5} />
+                <text x={p.x + 14} y={ty} fill="#e9ecf3" fontSize={12} fontWeight={600}>
+                  {base.name}
+                </text>
+                <text x={p.x + 14} y={ty + 13} fill="#667085" fontSize={10}>
+                  {base.workerCount} pals · {base.buildingCount} built · {base.coord.x}, {base.coord.y}
+                </text>
+              </g>
+            )
+          })
+        })()}
+
+        {/* Player last-known positions — labels hang below the dot to keep
+            clear of base labels, which sit above their markers. */}
+        {(players ?? []).map((player) => {
+          if (!player.coord) return null
+          const p = toScreen(player.coord.x, player.coord.y, size.w, size.h)
           return (
-            <g key={base.id}>
-              <circle cx={p.x} cy={p.y} r={radius} fill="var(--color-accent)" opacity={0.07} />
-              <circle cx={p.x} cy={p.y} r={radius} fill="none" stroke="var(--color-accent)" strokeOpacity={0.35} strokeDasharray="4 4" />
-              <circle cx={p.x} cy={p.y} r={5} fill="var(--color-accent)" />
-              <circle cx={p.x} cy={p.y} r={9} fill="none" stroke="var(--color-accent)" strokeOpacity={0.5} />
-              <text x={p.x + 12} y={ty} fill="#e9ecf3" fontSize={12} fontWeight={600}>
-                {base.name}
-              </text>
-              <text x={p.x + 12} y={ty + 13} fill="#667085" fontSize={10}>
-                {base.workerCount} pals · {base.buildingCount} built · {base.coord.x}, {base.coord.y}
+            <g key={player.uid}>
+              <circle cx={p.x} cy={p.y} r={4} fill="#3ddc97" />
+              <text x={p.x - 4} y={p.y + 17} fill="#3ddc97" fontSize={11}>
+                {player.name}
               </text>
             </g>
           )
         })}
-
-        {/* Player last-known positions */}
-        {(players ?? []).map((player) =>
-          player.coord ? (
-            <g key={player.uid}>
-              <circle cx={toScreen(player.coord.x, player.coord.y, size.w, size.h).x} cy={toScreen(player.coord.x, player.coord.y, size.w, size.h).y} r={4} fill="#3ddc97" />
-              <text
-                x={toScreen(player.coord.x, player.coord.y, size.w, size.h).x + 9}
-                y={toScreen(player.coord.x, player.coord.y, size.w, size.h).y + 4}
-                fill="#3ddc97"
-                fontSize={11}
-              >
-                {player.name}
-              </text>
-            </g>
-          ) : null,
-        )}
       </svg>
 
       {/* HUD */}
