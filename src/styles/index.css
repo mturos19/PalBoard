@@ -1,0 +1,118 @@
+@import 'tailwindcss';
+
+/*
+ * PalBoard theme.
+ *
+ * A single dark palette defined as design tokens so future themes only need to
+ * override these variables rather than touch component classes.
+ */
+@theme {
+  --color-canvas: #0a0c11;
+  --color-surface: #11141c;
+  --color-surface-2: #171b25;
+  --color-surface-3: #1e2331;
+  --color-line: #262c3a;
+  --color-line-soft: #1c2130;
+
+  --color-ink: #e8ebf2;
+  --color-ink-muted: #9aa4b8;
+  --color-ink-faint: #6b7488;
+
+  --color-accent: #4b9cff;
+  --color-accent-soft: #1d3355;
+  --color-mint: #3ddc97;
+  --color-amber: #f5b23d;
+  --color-rose: #ff6b6b;
+  --color-violet: #a78bfa;
+
+  --font-sans: 'Inter var', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
+
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* Slim, unobtrusive scrollbars that match the surface palette. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #353d4f;
+    background-clip: content-box;
+  }
+
+  /* Electron: never show the text caret for non-editable UI. */
+  button,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .app-drag {
+    -webkit-app-region: drag;
+  }
+  .app-no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Subtle entrance used by cards and route transitions. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-rise {
+    animation: rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+  }
+  .animate-pulse-dot {
+    animation: pulse-dot 1.6s ease-in-out infinite;
+  }
+}
