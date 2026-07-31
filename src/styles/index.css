@@ -1,34 +1,50 @@
+@import '@fontsource-variable/inter';
 @import 'tailwindcss';
 
 /*
- * PalBoard theme.
+ * PalBoard design system.
  *
- * A single dark palette defined as design tokens so future themes only need to
- * override these variables rather than touch component classes.
+ * Dark, layered, quiet. Everything hangs off these tokens: surfaces step up
+ * in lightness as they rise, ink steps down as it recedes, and one accent
+ * (user-selectable via [data-accent]) does all the talking.
  */
 @theme {
   --color-canvas: #0a0c11;
-  --color-surface: #11141c;
-  --color-surface-2: #171b25;
-  --color-surface-3: #1e2331;
-  --color-line: #262c3a;
-  --color-line-soft: #1c2130;
+  --color-surface: #10131a;
+  --color-surface-2: #161a23;
+  --color-surface-3: #1d222e;
+  --color-line: #272d3b;
+  --color-line-soft: #1b2029;
 
-  --color-ink: #e8ebf2;
+  --color-ink: #e9ecf3;
   --color-ink-muted: #9aa4b8;
-  --color-ink-faint: #6b7488;
+  --color-ink-faint: #667085;
 
   --color-accent: #4b9cff;
-  --color-accent-soft: #1d3355;
+  --color-accent-2: #8a74fa;
   --color-mint: #3ddc97;
   --color-amber: #f5b23d;
   --color-rose: #ff6b6b;
   --color-violet: #a78bfa;
 
-  --font-sans: 'Inter var', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
+  --font-sans: 'Inter Variable', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
 
   --radius-card: 0.75rem;
+}
+
+/* Accent variants — swapped at runtime from Settings. */
+:root[data-accent='violet'] {
+  --color-accent: #a78bfa;
+  --color-accent-2: #7c5cff;
+}
+:root[data-accent='mint'] {
+  --color-accent: #3ddc97;
+  --color-accent-2: #22b8cf;
+}
+:root[data-accent='amber'] {
+  --color-accent: #f5b23d;
+  --color-accent-2: #ff8a5c;
 }
 
 @layer base {
@@ -42,11 +58,11 @@
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-feature-settings: 'cv05', 'cv11';
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
 
-  /* Slim, unobtrusive scrollbars that match the surface palette. */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -61,11 +77,13 @@
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #353d4f;
+    background: #39415466;
     background-clip: content-box;
   }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 
-  /* Electron: never show the text caret for non-editable UI. */
   button,
   [role='button'] {
     -webkit-user-select: none;
@@ -86,7 +104,26 @@
     -webkit-app-region: no-drag;
   }
 
-  /* Subtle entrance used by cards and route transitions. */
+  /* Accent gradient used by primary buttons, the logo, and hero accents. */
+  .bg-accent-gradient {
+    background-image: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  }
+  .text-accent-gradient {
+    background-image: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Soft glow behind hero numbers and active markers. */
+  .glow-accent {
+    box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  .card-shadow {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+  }
+
   @keyframes rise {
     from {
       opacity: 0;
@@ -99,6 +136,32 @@
   }
   .animate-rise {
     animation: rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  .animate-slide-in {
+    animation: slide-in-right 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.18s ease-out both;
   }
 
   @keyframes pulse-dot {

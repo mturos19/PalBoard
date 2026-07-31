@@ -1,7 +1,22 @@
-import { FolderOpen, FolderSearch, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Bell, FolderOpen, FolderSearch, Palette, RefreshCw, ShieldCheck } from 'lucide-react'
+import { SPECIES_TABLE_SIZE } from '@shared/gamedata/species'
 import { Card, CardTitle } from '@/components/ui/Card'
-import { formatBytes, formatDateTime, formatDuration, formatRelativeTime } from '@/lib/format'
+import { cx, formatBytes, formatDateTime, formatDuration, formatRelativeTime } from '@/lib/format'
 import { useSyncStore } from '@/stores/syncStore'
+import { useUiStore, type Accent } from '@/stores/uiStore'
+
+const ACCENTS: Array<{ id: Accent; color: string; label: string }> = [
+  { id: 'blue', color: '#4b9cff', label: 'Sky' },
+  { id: 'violet', color: '#a78bfa', label: 'Violet' },
+  { id: 'mint', color: '#3ddc97', label: 'Mint' },
+  { id: 'amber', color: '#f5b23d', label: 'Amber' },
+]
+
+const SHORTCUTS: Array<[string, string]> = [
+  ['Ctrl K', 'Search everything'],
+  ['Ctrl R', 'Reload the save now'],
+  ['Esc', 'Close drawer or palette'],
+]
 
 export function SettingsPage() {
   const worldPath = useSyncStore((s) => s.worldPath)
@@ -12,6 +27,10 @@ export function SettingsPage() {
   const browseForWorld = useSyncStore((s) => s.browseForWorld)
   const reload = useSyncStore((s) => s.reload)
   const revealSaveFolder = useSyncStore((s) => s.revealSaveFolder)
+  const accent = useUiStore((s) => s.accent)
+  const setAccent = useUiStore((s) => s.setAccent)
+  const notificationsEnabled = useUiStore((s) => s.notificationsEnabled)
+  const setNotificationsEnabled = useUiStore((s) => s.setNotificationsEnabled)
 
   const d = snapshot?.diagnostics
 
@@ -120,6 +139,65 @@ export function SettingsPage() {
       ) : null}
 
       <Card index={3}>
+        <CardTitle>Appearance</CardTitle>
+        <div className="flex items-center gap-3">
+          <Palette size={15} className="text-ink-faint" />
+          <span className="flex-1 text-sm text-ink-muted">Accent colour</span>
+          <div className="flex gap-2">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setAccent(a.id)}
+                title={a.label}
+                className={cx(
+                  'size-7 rounded-full border-2 transition-transform hover:scale-110',
+                  accent === a.id ? 'border-ink' : 'border-transparent',
+                )}
+                style={{ background: a.color }}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          <Bell size={15} className="text-ink-faint" />
+          <span className="flex-1 text-sm text-ink-muted">
+            Desktop notifications for critical alerts
+            <span className="block text-[11px] text-ink-faint">Starving or sick pals raise a system notification</span>
+          </span>
+          <button
+            role="switch"
+            aria-checked={notificationsEnabled}
+            onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+            className={cx(
+              'relative h-5 w-9 rounded-full transition-colors',
+              notificationsEnabled ? 'bg-accent' : 'bg-surface-3',
+            )}
+          >
+            <span
+              className={cx(
+                'absolute top-0.5 size-4 rounded-full bg-ink transition-transform',
+                notificationsEnabled ? 'translate-x-4.5 left-0' : 'left-0.5',
+              )}
+            />
+          </button>
+        </div>
+      </Card>
+
+      <Card index={4}>
+        <CardTitle>Keyboard shortcuts</CardTitle>
+        <ul className="space-y-1.5 text-xs">
+          {SHORTCUTS.map(([keys, what]) => (
+            <li key={keys} className="flex items-center justify-between">
+              <span className="text-ink-muted">{what}</span>
+              <kbd className="rounded border border-line-soft bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">
+                {keys}
+              </kbd>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card index={5}>
         <div className="flex items-start gap-3">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-mint" />
           <div>
@@ -127,6 +205,10 @@ export function SettingsPage() {
             <p className="mt-0.5 text-xs text-ink-muted">
               PalBoard opens your save files for reading only and never writes to them. It is safe to
               keep running while you play.
+            </p>
+            <p className="mt-2 text-[11px] text-ink-faint">
+              PalBoard 0.2 · species table covers {SPECIES_TABLE_SIZE} internal ids; unmapped species
+              show their save id honestly rather than a guessed name.
             </p>
           </div>
         </div>

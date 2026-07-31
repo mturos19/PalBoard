@@ -1,11 +1,14 @@
 import { useDeferredValue, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, ArrowUp, Search, Star, Sparkles, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Download, Search, Star, Sparkles, X } from 'lucide-react'
 import type { Pal } from '@shared/domain'
 import { EmptyState } from '@/components/ui/Card'
+import { ElementBadge } from '@/components/ui/ElementBadge'
+import { PalAvatar } from '@/components/ui/PalAvatar'
 import { cx, formatNumber } from '@/lib/format'
 import { useSyncStore } from '@/stores/syncStore'
+import { useUiStore } from '@/stores/uiStore'
 
 type SortKey = 'level' | 'name' | 'species' | 'iv' | 'sanity' | 'stomach'
 type QuickFilter = 'alpha' | 'lucky' | 'condensed' | 'hungry' | 'depressed' | 'sick' | 'party' | 'base'
@@ -50,6 +53,7 @@ function matchesFilter(pal: Pal, filter: QuickFilter): boolean {
 export function PalsPage() {
   const pals = useSyncStore((s) => s.snapshot?.pals)
   const bases = useSyncStore((s) => s.snapshot?.bases)
+  const openPal = useUiStore((s) => s.openPal)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [query, setQuery] = useState('')
@@ -92,6 +96,7 @@ export function PalsPage() {
     const filtered = pals.filter((pal) => {
       // Tower bosses live in the save but are not owned pals.
       if (pal.isTowerBoss) return false
+      if (pal.isHuman) return false
       for (const f of active) if (!matchesFilter(pal, f)) return false
       if (!needle) return true
       return (
@@ -165,8 +170,17 @@ export function PalsPage() {
             ) : null}
           </div>
           <span className="shrink-0 text-xs tabular-nums text-ink-faint">
-            {formatNumber(rows.length)} of {formatNumber(pals.filter((p) => !p.isTowerBoss).length)}
+            {formatNumber(rows.length)} of{' '}
+            {formatNumber(pals.filter((p) => !p.isTowerBoss && !p.isHuman).length)}
           </span>
+          <button
+            onClick={() => void window.palboard.exportData('pals-csv')}
+            title="Export the pal list as CSV"
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-line-soft bg-surface px-3 text-xs text-ink-muted transition-colors hover:border-line hover:text-ink"
+          >
+            <Download size={13} />
+            CSV
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -208,15 +222,17 @@ export function PalsPage() {
             {virtualizer.getVirtualItems().map((item) => {
               const pal = rows[item.index]
               return (
-                <div
+                <button
                   key={pal.instanceId}
-                  className="absolute inset-x-0 flex items-center gap-3 border-b border-line-soft/50 px-4 text-sm hover:bg-surface-2"
+                  onClick={() => openPal(pal.instanceId)}
+                  className="absolute inset-x-0 flex items-center gap-3 border-b border-line-soft/50 px-4 text-left text-sm transition-colors hover:bg-surface-2"
                   style={{ height: item.size, transform: `translateY(${item.start}px)` }}
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <PalAvatar pal={pal} />
+                    <span className="truncate">{pal.nickname ?? pal.speciesName}</span>
                     {pal.isAlpha ? <Star size={12} className="shrink-0 text-amber" /> : null}
                     {pal.isLucky ? <Sparkles size={12} className="shrink-0 text-violet" /> : null}
-                    <span className="truncate">{pal.nickname ?? pal.speciesName}</span>
                     {pal.rank > 1 ? (
                       <span className="shrink-0 rounded bg-surface-3 px-1 text-[10px] text-ink-faint">
                         ★{pal.rank - 1}
@@ -224,7 +240,14 @@ export function PalsPage() {
                     ) : null}
                     <GenderMark gender={pal.gender} />
                   </div>
-                  <span className="w-32 truncate text-xs text-ink-muted">{pal.speciesName}</span>
+                  <span className="flex w-32 items-center gap-1.5 truncate text-xs text-ink-muted">
+                    <span className="flex shrink-0 gap-0.5">
+                      {pal.elements.map((el) => (
+                        <ElementBadge key={el} element={el} compact />
+                      ))}
+                    </span>
+                    <span className="truncate">{pal.speciesName}</span>
+                  </span>
                   <span className="w-14 text-right tabular-nums">{pal.level}</span>
                   <span className="w-28 text-right font-mono text-[11px] text-ink-muted">
                     {pal.ivHp}/{pal.ivAttack}/{pal.ivDefense}
@@ -236,8 +259,7 @@ export function PalsPage() {
                     )}
                     title={pal.isHungry ? `Hungry (${pal.hungerState})` : 'Fed'}
                   >
-                    {Math.round(pal.stomach)}
-                    {pal.isHungry ? ' ▾' : ''}
+                    {pal.isHungry ? 'hungry' : Math.round(pal.stomach)}
                   </span>
                   <Meter className="w-16" value={pal.sanity} warn={50} />
                   <span className="w-28 truncate text-xs text-ink-muted">
@@ -248,7 +270,7 @@ export function PalsPage() {
                   <span className="w-48 truncate text-[11px] text-ink-faint" title={pal.passiveSkills.join(', ')}>
                     {pal.passiveSkills.join(', ') || '—'}
                   </span>
-                </div>
+                </button>
               )
             })}
           </div>
