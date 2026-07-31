@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, Download, Search, Star, Sparkles, X } from 'lucide-react'
 import type { Pal } from '@shared/domain'
+import { skillDisplayName } from '@shared/gamedata/names'
 import { EmptyState } from '@/components/ui/Card'
 import { ElementBadge } from '@/components/ui/ElementBadge'
 import { PalAvatar } from '@/components/ui/PalAvatar'
@@ -103,7 +104,11 @@ export function PalsPage() {
         pal.speciesName.toLowerCase().includes(needle) ||
         pal.speciesId.toLowerCase().includes(needle) ||
         (pal.nickname?.toLowerCase().includes(needle) ?? false) ||
-        pal.passiveSkills.some((s) => s.toLowerCase().includes(needle))
+        pal.passiveSkills.some(
+          (s) =>
+            s.toLowerCase().includes(needle) ||
+            (skillDisplayName(s)?.toLowerCase().includes(needle) ?? false),
+        )
       )
     })
 
@@ -267,8 +272,11 @@ export function PalsPage() {
                       ? (baseNames.get(pal.baseId) ?? 'Base')
                       : pal.location}
                   </span>
-                  <span className="w-48 truncate text-[11px] text-ink-faint" title={pal.passiveSkills.join(', ')}>
-                    {pal.passiveSkills.join(', ') || '—'}
+                  <span
+                    className="w-48 truncate text-[11px] text-ink-faint"
+                    title={pal.passiveSkills.map((s) => skillDisplayName(s) ?? s).join(', ')}
+                  >
+                    {pal.passiveSkills.map((s) => skillDisplayName(s) ?? s).join(', ') || '—'}
                   </span>
                 </button>
               )

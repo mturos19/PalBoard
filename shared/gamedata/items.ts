@@ -4,6 +4,7 @@
  * observed in real saves; the raw id is always available in the UI, so a
  * miscategorised exotic item is a cosmetic issue, not a data one.
  */
+import { itemDisplayName } from './names'
 
 export type ItemCategory =
   | 'currency'
@@ -32,33 +33,6 @@ export const CATEGORY_LABELS: Record<ItemCategory, string> = {
   eggs: 'Eggs',
   keys: 'Keys & Treasure',
   other: 'Other',
-}
-
-/** Display-name overrides where the humanised id is misleading. */
-const NAME_OVERRIDES: Record<string, string> = {
-  Money: 'Gold Coin',
-  DogCoin: 'Dog Coin',
-  Pal_crystal_S: 'Paldium Fragment',
-  PalCrystal_Ex: 'High Grade Paldium',
-  PalFluid: 'Pal Fluids',
-  bone: 'Bone',
-  CrudeOil: 'Crude Oil',
-  Cloth2: 'Refined Cloth',
-  GunPowder2: 'Gunpowder',
-  MachineParts2: 'Advanced Machine Parts',
-  StealIngot: 'Refined Ingot',
-  StainlessSteel: 'Stainless Steel',
-  Wood_Fine: 'Fine Wood',
-  Wood_Ancient: 'Ancient Wood',
-  Processed_Wood: 'Processed Wood',
-  PalUpgradeStone: 'Small Pal Soul',
-  PalUpgradeStone2: 'Medium Pal Soul',
-  PalUpgradeStone3: 'Large Pal Soul',
-  PalUpgradeStone4: 'Giant Pal Soul',
-  AncientParts2: 'Ancient Civilization Parts',
-  AncientParts3: 'Ancient Civilization Core',
-  Homeward: 'Homeward Thundercloud',
-  SkyIslandOre: 'Sky Island Ore',
 }
 
 const FOOD_EXACT = new Set([
@@ -107,10 +81,14 @@ export function categorise(id: string): ItemCategory {
   return 'materials'
 }
 
-/** `AssaultRifleBullet` -> `Assault Rifle Bullet`, with curated overrides. */
+/**
+ * Display name for an item id: the game's own extracted name table first
+ * (authoritative — `StealIngot` is really "Pal Metal Ingot"), humanised id as
+ * the fallback for anything a future patch adds before re-extraction.
+ */
 export function itemName(id: string): string {
-  const override = NAME_OVERRIDES[id]
-  if (override) return override
+  const fromGame = itemDisplayName(id)
+  if (fromGame) return fromGame
   return id
     .replace(/_/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')

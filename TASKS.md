@@ -64,6 +64,14 @@ Running log of concrete work. See [ROADMAP.md](ROADMAP.md) for the phase plan.
       inventory page, dashboard v2, accent themes, custom title bar, app icon,
       CSV/JSON exports, window-state persistence, single-instance lock
 - [x] 48 tests across compression, GVAS, gamedata, alerts, model
+- [x] **Authoritative names from the game's own files**: a minimal UE pak reader
+      (footer/index/Oodle blocks) plus a structural text-DataTable walker extract
+      DT_PalNameText / ItemNameText / SkillNameText / HumanNameText from
+      Pal-Windows.pak into a committed JSON — 322 pal, 1,993 item, 1,141 skill
+      names. 100% name coverage on a real save; a consistency test pins every
+      curated entry to the game name (it caught RedArmorBird≠Rooby,
+      HawkBird≠Galeclaw, PinkRabbit≠Flopie and 15 Yakumo misclassified as
+      humans). Re-run with `npm run extract-gamedata` after a game update.
 
 ## Next up
 
@@ -74,9 +82,11 @@ Running log of concrete work. See [ROADMAP.md](ROADMAP.md) for the phase plan.
 
 ## Known limitations
 
-- **Species table is partial by design** (~130 confidently known ids; ~57% of a late-game
-  1.0 save's pals). Unmapped species — mostly post-1.0 additions like `MonochromeQueen` —
-  show a humanised id and a hash-colored avatar rather than a guessed name.
+- **Names are complete; elements are not.** Names come from the game's own tables
+  (100% coverage). Elements/work remain curated (~135 species) plus the game's
+  elemental subspecies suffixes; post-1.0 base forms (Solenne, Eidrolon…) show no
+  element badge until curated or until DT_PalMonsterParameter parsing (needs a
+  .usmap for unversioned properties) lands.
 - **Play time is not shown** — Palworld does not record it in the save. PalBoard will
   need to track it itself over time.
 - **Base names are generated** (`Base 1`, `Base 2`) because Palworld stores only an

@@ -2,6 +2,7 @@
 import { useMemo } from 'react'
 import { Brain, Heart, MapPin, Star, Sparkles, User, UtensilsCrossed, Zap } from 'lucide-react'
 import type { Pal } from '@shared/domain'
+import { skillDisplayName } from '@shared/gamedata/names'
 import { speciesInfo, type WorkKey } from '@shared/gamedata/species'
 import { Drawer } from './ui/Drawer'
 import { ElementBadge } from './ui/ElementBadge'
@@ -187,8 +188,12 @@ function Body({ pal, baseName, ownerName }: { pal: Pal; baseName: string | null;
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {pal.passiveSkills.map((skill) => (
-              <span key={skill} className="rounded-md border border-line-soft bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-muted">
-                {skill}
+              <span
+                key={skill}
+                title={skill}
+                className="rounded-md border border-line-soft bg-surface-2 px-2 py-1 text-[11px] text-ink-muted"
+              >
+                {skillDisplayName(skill) ?? skill}
               </span>
             ))}
           </div>
@@ -198,16 +203,24 @@ function Body({ pal, baseName, ownerName }: { pal: Pal; baseName: string | null;
       <Section title="Active skills">
         <div className="flex flex-wrap gap-1.5">
           {pal.equippedSkills.map((skill) => (
-            <span key={skill} className="flex items-center gap-1 rounded-md border border-accent/25 bg-accent/10 px-2 py-1 text-[11px] text-accent">
+            <span
+              key={skill}
+              title={skill}
+              className="flex items-center gap-1 rounded-md border border-accent/25 bg-accent/10 px-2 py-1 text-[11px] text-accent"
+            >
               <Zap size={10} />
-              {skill}
+              {skillDisplayName(skill) ?? skill}
             </span>
           ))}
           {pal.masteredSkills
             .filter((s) => !pal.equippedSkills.includes(s))
             .map((skill) => (
-              <span key={skill} className="rounded-md border border-line-soft bg-surface-2 px-2 py-1 text-[11px] text-ink-faint">
-                {skill}
+              <span
+                key={skill}
+                title={skill}
+                className="rounded-md border border-line-soft bg-surface-2 px-2 py-1 text-[11px] text-ink-faint"
+              >
+                {skillDisplayName(skill) ?? skill}
               </span>
             ))}
         </div>

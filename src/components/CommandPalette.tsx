@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { itemName } from '@shared/gamedata/items'
+import { skillDisplayName } from '@shared/gamedata/names'
 import { cx, formatNumber } from '@/lib/format'
 import { useSyncStore } from '@/stores/syncStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -102,7 +103,9 @@ export function CommandPalette() {
           label: pal.nickname ?? pal.speciesName,
           hint: `${pal.isAlpha ? 'Alpha ' : ''}${pal.speciesName} · Lv ${pal.level}`,
           icon: pal.isAlpha ? Star : Cat,
-          keywords: `${pal.speciesName} ${pal.speciesId} ${pal.passiveSkills.join(' ')}`,
+          keywords: `${pal.speciesName} ${pal.speciesId} ${pal.passiveSkills
+            .map((s) => skillDisplayName(s) ?? s)
+            .join(' ')}`,
           run: () => {
             navigate('/pals')
             openPal(pal.instanceId)

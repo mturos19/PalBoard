@@ -55,11 +55,13 @@ describe('item categorisation', () => {
     expect(categorise('IronArmor_4')).toBe('equipment')
   })
 
-  it('names items with overrides and humanisation', () => {
+  it('names items from the game data tables', () => {
     expect(itemName('Money')).toBe('Gold Coin')
     expect(itemName('Pal_crystal_S')).toBe('Paldium Fragment')
-    expect(itemName('AssaultRifleBullet')).toBe('Assault Rifle Bullet')
-    expect(itemName('CopperOre')).toBe('Copper Ore')
+    // The game's own names, not humanised ids: it really is "Ammo", and the
+    // mined item is displayed simply as "Ore" in-game.
+    expect(itemName('AssaultRifleBullet')).toBe('Assault Rifle Ammo')
+    expect(itemName('CopperOre')).toBe('Ore')
   })
 })
 
@@ -73,8 +75,11 @@ describe('species table', () => {
     expect(speciesInfo('ManticoreDark')?.name).toBe('Blazehowl Noct')
   })
 
-  it('returns null for unmapped species rather than guessing', () => {
-    expect(speciesInfo('MonochromeQueen')).toBeNull()
+  it('resolves post-1.0 species from the extracted game names', () => {
+    // Previously null (no curated entry); the game data supplies the name.
+    expect(speciesInfo('MonochromeQueen')?.name).toBe('Solenne')
+    // Truly unknown ids still return null rather than a guess.
+    expect(speciesInfo('NotARealPalId')).toBeNull()
   })
 
   it('flags captured humans', () => {

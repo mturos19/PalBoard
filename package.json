@@ -18,7 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dist": "npm run build && electron-builder --win --publish never",
-    "make-icon": "node tools/make-icon.mjs"
+    "make-icon": "node tools/make-icon.mjs",
+    "extract-gamedata": "vite-node tools/extract-gamedata.ts"
   },
   "dependencies": {
     "chokidar": "^4.0.3",

@@ -77,10 +77,13 @@ console.log('\n--- records ---')
 for (const r of snap.records) console.log(`  ${r.name}: paldeck=${r.paldeckCount} towers=${r.towersCleared} fastTravel=${r.fastTravelsUnlocked} captures=${r.totalCaptures}`)
 console.log('\n--- alerts ---')
 for (const a of snap.alerts) console.log(`  [${a.severity}] ${a.title} — ${a.detail}`)
-console.log('\n--- species table hits ---')
-const mapped = snap.pals.filter((p) => p.elements.length > 0).length
+console.log('\n--- species data coverage ---')
+const { palDisplayName } = await import('../shared/gamedata/names')
+const named = snap.pals.filter((p) => !p.isHuman && palDisplayName(p.speciesId) !== null).length
+const withElements = snap.pals.filter((p) => p.elements.length > 0).length
 const humans = snap.pals.filter((p) => p.isHuman).length
-console.log(`  ${mapped}/${snap.pals.length} pals resolved by table; ${humans} humans detected`)
-const unmapped = new Map<string, number>()
-for (const p of snap.pals) if (!p.elements.length && !p.isHuman) unmapped.set(p.speciesId, (unmapped.get(p.speciesId) ?? 0) + 1)
-console.log('  top unmapped:', [...unmapped].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => `${k}×${v}`).join(', '))
+console.log(`  names: ${named}/${snap.pals.length - humans} pals resolved from game data; ${humans} humans detected`)
+console.log(`  elements known for ${withElements}`)
+const noElement = new Map<string, number>()
+for (const p of snap.pals) if (!p.elements.length && !p.isHuman) noElement.set(`${p.speciesId}(${p.speciesName})`, (noElement.get(`${p.speciesId}(${p.speciesName})`) ?? 0) + 1)
+console.log('  top without elements:', [...noElement].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `${k}×${v}`).join(', '))

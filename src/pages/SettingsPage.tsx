@@ -1,4 +1,5 @@
 import { Bell, FolderOpen, FolderSearch, Palette, RefreshCw, ShieldCheck } from 'lucide-react'
+import { NAME_COUNTS } from '@shared/gamedata/names'
 import { SPECIES_TABLE_SIZE } from '@shared/gamedata/species'
 import { Card, CardTitle } from '@/components/ui/Card'
 import { cx, formatBytes, formatDateTime, formatDuration, formatRelativeTime } from '@/lib/format'
@@ -207,8 +208,11 @@ export function SettingsPage() {
               keep running while you play.
             </p>
             <p className="mt-2 text-[11px] text-ink-faint">
-              PalBoard 0.2 · species table covers {SPECIES_TABLE_SIZE} internal ids; unmapped species
-              show their save id honestly rather than a guessed name.
+              PalBoard 0.2 · names extracted from the game's own data tables ({NAME_COUNTS.pals} pals,{' '}
+              {NAME_COUNTS.items.toLocaleString()} items, {NAME_COUNTS.skills.toLocaleString()} skills) ·
+              elements curated for {SPECIES_TABLE_SIZE} species, plus the game's own subspecies
+              suffixes. Re-run <code className="font-mono">npm run extract-gamedata</code> after a game
+              update.
             </p>
           </div>
         </div>
