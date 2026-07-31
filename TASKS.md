@@ -48,20 +48,35 @@ Running log of concrete work. See [ROADMAP.md](ROADMAP.md) for the phase plan.
 - [x] Electron ESM: `electron`'s CJS shim has no named ESM exports → build main as CommonJS
 - [x] `ooz-wasm` is ESM with top-level await → load it through a real dynamic import
 
-## Next up (Phase 2)
+### Market-ready push (July 2026)
 
-- [ ] Bundle a species data table (display names, work suitabilities, max stomach,
-      elements). This is the biggest single unlock — several Phase 2 items depend on it.
-- [ ] Decode `ItemContainerSaveData` slots for inventory and storage views
+- [x] **Slot layout reverse-engineered**: post-0.3.7 item slots are custom binary
+      (`u32 index, u32 count, fstring id, 2×guid dynamic ref`). Verified against all
+      10,907 slots of a real save with zero failures.
+- [x] Inventory: world storage aggregation + per-player pouches + resource totals
+- [x] Species data table (~130 well-established ids → names/elements/suitabilities),
+      case/underscore-insensitive lookup, captured-human detection, honest fallback
+- [x] Item names, category rules, resource groups from the real id vocabulary
+- [x] Alerts engine (starving/sick/depressed/storage/palbox/idle bases) + OS notifications
+- [x] Player records: Paldeck count (= captured species), towers, fast travels, captures
+- [x] History time-series (JSONL per world in userData) + over-time charts
+- [x] Pal detail drawer, command palette (Ctrl+K), pan/zoom map, statistics page,
+      inventory page, dashboard v2, accent themes, custom title bar, app icon,
+      CSV/JSON exports, window-state persistence, single-instance lock
+- [x] 48 tests across compression, GVAS, gamedata, alerts, model
+
+## Next up
+
 - [ ] Decode `MapObjectSaveData` `ConcreteModel` for per-building status and production
-- [ ] Pal detail drawer with effective stats
 - [ ] Breeding farms, egg timers, expected offspring
+- [ ] Per-base storage attribution (needs ConcreteModel container links)
+- [ ] Move parsing to a worker thread before heavier derived data lands
 
 ## Known limitations
 
-- **Species names are humanised developer ids** (`Manticore_Dark` → "Manticore Dark"),
-  not the game's localised names. Fixing this needs the species data table; inventing
-  names would be worse than showing the honest id.
+- **Species table is partial by design** (~130 confidently known ids; ~57% of a late-game
+  1.0 save's pals). Unmapped species — mostly post-1.0 additions like `MonochromeQueen` —
+  show a humanised id and a hash-colored avatar rather than a guessed name.
 - **Play time is not shown** — Palworld does not record it in the save. PalBoard will
   need to track it itself over time.
 - **Base names are generated** (`Base 1`, `Base 2`) because Palworld stores only an

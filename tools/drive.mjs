@@ -1,5 +1,5 @@
 /**
- * Dev utility: launches the built PalBoard app and drives it like a user.
+ * Dev utility: launches the built PalBoard app and drives every page.
  * Run with `node tools/drive.mjs` after `npm run build`.
  */
 import { mkdirSync } from 'node:fs'
@@ -9,8 +9,7 @@ const SHOTS = 'shots'
 mkdirSync(SHOTS, { recursive: true })
 
 // Some shells export ELECTRON_RUN_AS_NODE=1, which makes the Electron binary
-// behave as plain Node — `require('electron')` then returns a path string and
-// `app` is undefined. Strip it so we launch a real Electron process.
+// behave as plain Node. Strip it so we launch a real Electron process.
 const env = { ...process.env }
 delete env.ELECTRON_RUN_AS_NODE
 
@@ -24,63 +23,66 @@ win.on('console', (m) => {
 win.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 
 await win.waitForLoadState('domcontentloaded')
-
-// The dashboard only appears once main has parsed the save and pushed state.
 console.log('waiting for save to load…')
-await win.waitForSelector('text=Day', { timeout: 60_000 })
-await win.waitForTimeout(600) // let entrance animations settle
+await win.waitForSelector('text=Species caught', { timeout: 60_000 })
+await win.waitForTimeout(700)
+console.log('title:', await win.title())
 
-const title = await win.title()
-console.log('window title:', title)
-
-const readStat = async (label) => {
-  const el = win.locator(`p:text-is("${label}")`).first()
-  if ((await el.count()) === 0) return null
-  return (await el.locator('xpath=following-sibling::p[1]').textContent())?.trim()
+const shot = async (name) => {
+  await win.waitForTimeout(450)
+  await win.screenshot({ path: `${SHOTS}/${name}.png` })
+  console.log('shot:', name)
 }
 
-console.log('\n--- dashboard stat cards ---')
-for (const label of ['Day', 'Pals', 'Bases', 'Workers', 'Alphas', 'Guild']) {
-  console.log(`  ${label.padEnd(8)} ${await readStat(label)}`)
-}
+// --- Dashboard ---------------------------------------------------------------
+await shot('01-dashboard')
 
-console.log('\nworld heading:', (await win.locator('header h1').textContent())?.trim())
-console.log('sync pill    :', (await win.locator('header button').last().textContent())?.trim())
-await win.screenshot({ path: `${SHOTS}/01-dashboard.png` })
-
-// --- Pals page: search + virtualization -------------------------------------
+// --- Pals + drawer -----------------------------------------------------------
 await win.click('a[href="#/pals"]')
 await win.waitForSelector('input[placeholder*="Search"]')
-await win.waitForTimeout(400)
-console.log('\npals count label:', (await win.locator('text=/ of /').first().textContent())?.trim())
-const rowCount = await win.locator('.absolute.inset-x-0').count()
-console.log('rendered rows (virtualized):', rowCount)
-await win.screenshot({ path: `${SHOTS}/02-pals.png` })
+await shot('02-pals')
+// Open the first row's drawer.
+await win.locator('.absolute.inset-x-0').first().click()
+await win.waitForSelector('text=Individual values')
+await shot('03-pal-drawer')
+await win.keyboard.press('Escape')
 
-await win.fill('input[placeholder*="Search"]', 'kelpie')
-await win.waitForTimeout(500)
-console.log('after search "kelpie":', (await win.locator('text=/ of /').first().textContent())?.trim())
-await win.screenshot({ path: `${SHOTS}/03-pals-search.png` })
+// --- Inventory ---------------------------------------------------------------
+await win.click('a[href="#/inventory"]')
+await win.waitForSelector('text=World storage')
+await shot('04-inventory')
+await win.fill('input[placeholder*="Search items"]', 'sphere')
+await shot('05-inventory-search')
+await win.fill('input[placeholder*="Search items"]', '')
 
-// Filter chip
-await win.fill('input[placeholder*="Search"]', '')
-await win.click('button:text-is("Alpha")')
-await win.waitForTimeout(400)
-console.log('after Alpha filter:', (await win.locator('text=/ of /').first().textContent())?.trim())
-await win.screenshot({ path: `${SHOTS}/04-pals-alpha.png` })
+// --- Map ---------------------------------------------------------------------
+await win.click('a[href="#/map"]')
+await win.waitForSelector('text=bases')
+await shot('06-map')
 
-// --- Bases page --------------------------------------------------------------
-await win.click('a[href="#/bases"]')
-await win.waitForTimeout(600)
-const baseCards = await win.locator('h2').allTextContents()
-console.log('\nbase cards:', baseCards.join(', '))
-await win.screenshot({ path: `${SHOTS}/05-bases.png` })
+// --- Statistics --------------------------------------------------------------
+await win.click('a[href="#/statistics"]')
+await win.waitForSelector('text=Level distribution')
+await win.waitForTimeout(900) // recharts animation
+await shot('07-statistics')
+
+// --- Command palette ---------------------------------------------------------
+await win.keyboard.press('Control+k')
+await win.waitForSelector('input[placeholder*="Search pals"]')
+await win.fill('input[placeholder*="Search pals"]', 'blaze')
+await shot('08-palette')
+await win.keyboard.press('Escape')
+
+// --- Alerts bell -------------------------------------------------------------
+await win.click('button[title="Alerts"]')
+await shot('09-alerts')
+await win.keyboard.press('Escape')
 
 // --- Settings ----------------------------------------------------------------
 await win.click('a[href="#/settings"]')
-await win.waitForTimeout(600)
-await win.screenshot({ path: `${SHOTS}/06-settings.png` })
+await win.waitForSelector('text=Appearance')
+await shot('10-settings')
 
 console.log('\nconsole errors:', errors.length ? errors : 'none')
 await app.close()
-console.log('screenshots written to', SHOTS)
+console.log('done —', SHOTS)

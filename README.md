@@ -5,18 +5,20 @@ parses it, and keeps the UI live as the game autosaves. It never writes to your 
 
 ## What works today
 
-- **Auto-detects** Palworld worlds on Windows (and Proton/Wine layouts), or point it at a folder manually.
-- **Live sync** — watches the world folder and re-parses within a couple of seconds of an autosave.
-- **Dashboard** — day, difficulty, pal/species counts, bases, structures, workers, alphas, guild,
-  technology points, and pals that need attention.
-- **Pals** — all owned pals in a virtualized table with search (species / nickname / passive) and
-  filters (alpha, lucky, condensed, party, base, hungry, depressed, sick), sortable by level, IVs,
-  food and sanity.
-- **Bases** — per-base map coordinates, worker roster, structure counts, and problem pals.
-- **Settings** — switch worlds, inspect parser diagnostics and warnings.
+- **Auto-detects** Palworld worlds (Windows and Proton/Wine layouts), remembers the last one, or point it at a folder manually.
+- **Live sync** — watches the world folder and re-parses within a couple of seconds of an autosave; single-instance app with persisted window state and a native-overlay custom title bar.
+- **Dashboard** — hero summary, live resource strip (gold, wood, ore, ingots…), alerts, pals needing attention, per-player technology points, Paldeck species caught, towers cleared, fast travels unlocked.
+- **Pals** — every owned pal in a virtualized table: species names and elements from a bundled data table, avatars, search, quick filters, sorting — and a full **detail drawer** (IVs, souls, condense rank, work suitability with base+added levels, skills, whereabouts).
+- **Inventory** — all 10k+ storage slots decoded and aggregated: world storage plus each player's pouches, searchable, category-filtered, sortable, CSV export.
+- **Map** — pan/zoom map in the game's own compass coordinates: bases with their real influence radius, worker/structure counts, and last player positions.
+- **Statistics** — level distribution, element donut, top species, IV quality, plus **pals/resources over time** recorded by PalBoard itself (the save keeps no history).
+- **Alerts & notifications** — starving/sick/depressed pals, near-full storage, near-full palbox, idle bases; critical ones raise OS notifications (toggleable).
+- **Command palette** — `Ctrl+K` fuzzy search across pals, items, bases, pages and actions.
+- **Exports** — pals as CSV/JSON, storage as CSV.
+- **Settings** — switch worlds, accent themes, shortcuts, parser diagnostics and warnings.
 
-Verified against a real Palworld 1.0 save: 26.6 MB of decompressed save data,
-581 characters, 3 bases, 3,626 structures, parsed in **~300 ms** end to end.
+Verified against a real Palworld 1.0 save: 26.6 MB of decompressed save data, 581 characters,
+3 bases, 3,626 structures, **10,907 item slots** — parsed in **~330 ms** end to end, zero warnings.
 
 ## Quick start
 
@@ -42,6 +44,13 @@ container. Three container variants exist, and PalBoard reads all of them:
 Oodle is proprietary, so decoding uses [`ooz-wasm`](https://github.com/SnosMe/ooz-wasm) —
 a WebAssembly build of the open-source `ooz` reimplementation. It is decode-only,
 which is all a read-only dashboard needs.
+
+### Species and item names
+
+The save stores internal ids (`KingBahamut`, `Pal_crystal_S`). A bundled community data
+table maps the well-established ones to display names, elements and base work
+suitabilities (~130 species); anything unmapped shows a humanised id rather than a guess.
+Item categories are rule-based over the id vocabulary observed in real saves.
 
 ### Two things make it fast
 

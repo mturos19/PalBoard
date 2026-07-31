@@ -64,3 +64,23 @@ for (const p of top) {
       `${p.location} food=${p.stomach.toFixed(0)} san=${p.sanity.toFixed(0)} [${p.passiveSkills.join(',')}]`,
   )
 }
+
+console.log('\n--- inventory ---')
+console.log(`  storage: ${snap.storage.items.length} distinct items, ${snap.storage.usedSlots}/${snap.storage.totalSlots} slots across ${snap.storage.containerCount} containers, ${snap.storage.nearFullContainers} near full`)
+console.log('  top items:', snap.storage.items.slice(0, 8).map((i) => `${i.id}×${i.count}`).join(', '))
+for (const inv of snap.inventories) {
+  console.log(`  ${inv.name}: common=${inv.common.length} weapons=${inv.weapons.length} armor=${inv.armor.length} food=${inv.food.length}`)
+}
+console.log('\n--- resources ---')
+console.log(' ', JSON.stringify(snap.resources))
+console.log('\n--- records ---')
+for (const r of snap.records) console.log(`  ${r.name}: paldeck=${r.paldeckCount} towers=${r.towersCleared} fastTravel=${r.fastTravelsUnlocked} captures=${r.totalCaptures}`)
+console.log('\n--- alerts ---')
+for (const a of snap.alerts) console.log(`  [${a.severity}] ${a.title} — ${a.detail}`)
+console.log('\n--- species table hits ---')
+const mapped = snap.pals.filter((p) => p.elements.length > 0).length
+const humans = snap.pals.filter((p) => p.isHuman).length
+console.log(`  ${mapped}/${snap.pals.length} pals resolved by table; ${humans} humans detected`)
+const unmapped = new Map<string, number>()
+for (const p of snap.pals) if (!p.elements.length && !p.isHuman) unmapped.set(p.speciesId, (unmapped.get(p.speciesId) ?? 0) + 1)
+console.log('  top unmapped:', [...unmapped].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => `${k}×${v}`).join(', '))
