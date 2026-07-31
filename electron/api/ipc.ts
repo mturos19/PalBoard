@@ -5,10 +5,14 @@
  * stitch partial updates together, and the same shape is pushed on the
  * `stateChanged` channel when the watcher triggers a reload.
  */
+import { writeFile } from 'node:fs/promises'
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { defaultSaveRoots } from '../locator'
+import { buildExport, type ExportKind } from '../services/exporter'
 import type { SaveStore } from '../services/saveStore'
 import { IPC } from '../../shared/ipc'
+
+const EXPORT_KINDS: ReadonlySet<string> = new Set(['pals-csv', 'pals-json', 'items-csv'])
 
 export function registerIpc(store: SaveStore, getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.getState, () => store.state)
@@ -36,6 +40,24 @@ export function registerIpc(store: SaveStore, getWindow: () => BrowserWindow | n
   })
 
   ipcMain.handle(IPC.reload, () => store.reload())
+
+  ipcMain.handle(IPC.getHistory, () => store.getHistory())
+
+  ipcMain.handle(IPC.exportData, async (_event, kind: unknown) => {
+    const snapshot = store.state.snapshot
+    if (typeof kind !== 'string' || !EXPORT_KINDS.has(kind) || !snapshot) return null
+
+    const { data, defaultName, filter } = buildExport(kind as ExportKind, snapshot)
+    const window = getWindow()
+    const options: Electron.SaveDialogOptions = { defaultPath: defaultName, filters: [filter] }
+    const result = window
+      ? await dialog.showSaveDialog(window, options)
+      : await dialog.showSaveDialog(options)
+    if (result.canceled || !result.filePath) return null
+
+    await writeFile(result.filePath, data, 'utf8')
+    return result.filePath
+  })
 
   ipcMain.handle(IPC.revealSaveFolder, async () => {
     const target = store.state.worldPath ?? defaultSaveRoots()[0]

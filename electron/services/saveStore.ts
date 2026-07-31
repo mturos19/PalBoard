@@ -14,7 +14,10 @@ import { discoverWorlds, resolveWorldFolder } from '../locator'
 import { loadWorld } from '../parser/loader'
 import { computeStats } from '../parser/palworld/model'
 import { SaveWatcher } from '../watcher'
+import { HistoryStore } from './history'
+import { loadPrefs, savePrefs } from './prefs'
 import type { SyncState } from '../../shared/ipc'
+import type { HistoryPoint } from '../../shared/domain'
 
 export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
   private current: SyncState = {
@@ -29,6 +32,7 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
   }
 
   private readonly watcher = new SaveWatcher()
+  private readonly history = new HistoryStore()
   private revision = 0
   private loading = false
   /** Set when a save write arrives mid-parse; triggers exactly one re-run. */
@@ -53,12 +57,26 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
     this.emit('change', this.current)
   }
 
-  /** Scans disk for worlds and adopts the most recently played one. */
+  /**
+   * Scans disk for worlds, then adopts the world the user had open last —
+   * falling back to the most recently played.
+   */
   async initialise(): Promise<SyncState> {
     const worlds = await discoverWorlds()
     this.patch({ worlds })
-    if (worlds.length > 0) await this.selectWorld(worlds[0].path)
+    const remembered = loadPrefs().lastWorldPath
+    const target =
+      (remembered && worlds.find((w) => w.path === remembered)?.path) ??
+      remembered ??
+      worlds[0]?.path
+    if (target) await this.selectWorld(target)
     return this.current
+  }
+
+  /** History points recorded for the currently open world. */
+  async getHistory(): Promise<HistoryPoint[]> {
+    const worldId = this.current.snapshot?.world.worldId
+    return worldId ? this.history.load(worldId) : []
   }
 
   async refreshWorldList(): Promise<SyncState> {
@@ -81,6 +99,7 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
     }
 
     this.patch({ worldPath: resolved.path, status: 'loading', error: null })
+    savePrefs({ lastWorldPath: resolved.path })
     await this.watcher.start(resolved.path)
     await this.reload()
     return this.current
@@ -110,6 +129,8 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
           error: null,
           lastSyncedAt: Date.now(),
         })
+        // Record the time-series point after the UI has the fresh state.
+        await this.history.append(snapshot).catch(() => {})
       } while (this.reloadQueued)
     } catch (err) {
       this.patch({ status: 'error', error: (err as Error).message })

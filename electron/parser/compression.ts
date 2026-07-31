@@ -29,17 +29,15 @@ type OozDecompress = (data: Uint8Array, rawSize: number) => Uint8Array
  * is built as CommonJS — Electron's ESM loader cannot resolve named exports
  * from the `electron` shim — so we reach it through a genuine dynamic import.
  *
- * The indirection through `Function` keeps the bundler from rewriting `import()`
- * into a `require()` call, which would reintroduce the same failure.
+ * Rollup keeps external dynamic imports as real `import()` in CJS output
+ * (`output.dynamicImportInCjs`, on by default), so this survives bundling; and
+ * unlike a `Function('import(...)')` indirection it also works under vite-node,
+ * which has no dynamic-import callback in eval'd contexts.
  */
-const dynamicImport = new Function('specifier', 'return import(specifier)') as (
-  specifier: string,
-) => Promise<{ decompress: OozDecompress }>
-
 let oozPromise: Promise<OozDecompress> | null = null
 
 function loadOodle(): Promise<OozDecompress> {
-  oozPromise ??= dynamicImport('ooz-wasm').then((m) => m.decompress)
+  oozPromise ??= import('ooz-wasm').then((m) => m.decompress)
   return oozPromise
 }
 

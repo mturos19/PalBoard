@@ -54,6 +54,8 @@ export interface Player {
   /** Allocated status points by stat name. */
   statusPoints: Record<string, number>
   location: Vec3 | null
+  /** In-game map coordinates derived from `location`. */
+  coord: MapCoord | null
   guildId: string | null
   /** Only available when the matching Players/<uid>.sav could be read. */
   technologyPoints: number | null
@@ -75,6 +77,17 @@ export interface MapCoord {
 
 export type Gender = 'male' | 'female' | 'unknown'
 
+export type PalElement =
+  | 'neutral'
+  | 'fire'
+  | 'water'
+  | 'grass'
+  | 'electric'
+  | 'ice'
+  | 'ground'
+  | 'dark'
+  | 'dragon'
+
 export interface Pal {
   /** Character instance id — stable across saves, used as the React key. */
   instanceId: string
@@ -82,8 +95,12 @@ export interface Pal {
   characterId: string
   /** Species id with the alpha/boss prefix stripped. */
   speciesId: string
-  /** Human-readable species name. */
+  /** Display name from the species table, or a humanised id as fallback. */
   speciesName: string
+  /** Elements from the species table; empty when the species is unmapped. */
+  elements: PalElement[]
+  /** True for captured humans (guards, raiders), which are not pals. */
+  isHuman: boolean
   nickname: string | null
   gender: Gender
   level: number
@@ -167,6 +184,77 @@ export interface BaseCamp {
   buildingCount: number
 }
 
+// --- inventory ----------------------------------------------------------------
+
+export interface ItemStack {
+  /** Raw static item id from the save, e.g. `PalSphere_Mega`. */
+  id: string
+  count: number
+}
+
+/** One player's equipment/pouch containers, decoded from their player save. */
+export interface PlayerInventory {
+  uid: string
+  name: string
+  common: ItemStack[]
+  essential: ItemStack[]
+  weapons: ItemStack[]
+  armor: ItemStack[]
+  food: ItemStack[]
+}
+
+export interface StorageSummary {
+  /** Every item outside player pouches, aggregated by id, sorted by count. */
+  items: ItemStack[]
+  containerCount: number
+  totalSlots: number
+  usedSlots: number
+  /** Containers at ≥95% capacity (excluding player pouches). */
+  nearFullContainers: number
+}
+
+/** Sums for the dashboard resource strip, keyed by RESOURCE_GROUPS keys. */
+export type ResourceTotals = Record<string, number>
+
+// --- alerts -------------------------------------------------------------------
+
+export type AlertSeverity = 'critical' | 'warning' | 'info'
+
+export interface Alert {
+  /** Stable id for diffing between snapshots, e.g. `starving`. */
+  id: string
+  severity: AlertSeverity
+  title: string
+  detail: string
+  /** Route the alert links to, e.g. `/pals?filter=hungry`. */
+  link: string | null
+}
+
+// --- player records -----------------------------------------------------------
+
+/** Progression counters from player-save RecordData. */
+export interface PlayerRecords {
+  uid: string
+  name: string
+  /** Species registered in the Paldeck — "captured species". */
+  paldeckCount: number
+  towersCleared: number
+  fastTravelsUnlocked: number
+  totalCaptures: number
+}
+
+// --- history ------------------------------------------------------------------
+
+/** One appended point of PalBoard's own time-series (the save keeps none). */
+export interface HistoryPoint {
+  /** Save timestamp (ms epoch) — the dedupe key. */
+  t: number
+  day: number | null
+  pals: number
+  workers: number
+  resources: ResourceTotals
+}
+
 export interface SaveDiagnostics {
   /** Container format detected, e.g. `PlM/oodle`. */
   format: string
@@ -192,6 +280,11 @@ export interface SaveSnapshot {
   players: Player[]
   pals: Pal[]
   bases: BaseCamp[]
+  inventories: PlayerInventory[]
+  storage: StorageSummary
+  resources: ResourceTotals
+  records: PlayerRecords[]
+  alerts: Alert[]
   diagnostics: SaveDiagnostics
 }
 

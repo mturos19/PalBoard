@@ -9,6 +9,8 @@ function makePal(overrides: Partial<Pal> = {}): Pal {
     characterId: 'Sheepball',
     speciesId: 'Sheepball',
     speciesName: 'Sheepball',
+    elements: [],
+    isHuman: false,
     nickname: null,
     gender: 'female',
     level: 10,
@@ -64,6 +66,11 @@ function makeSnapshot(pals: Pal[]): SaveSnapshot {
     guilds: [],
     players: [],
     pals,
+    inventories: [],
+    storage: { items: [], containerCount: 0, totalSlots: 0, usedSlots: 0, nearFullContainers: 0 },
+    resources: {},
+    records: [],
+    alerts: [],
     bases: [
       {
         id: 'b1',

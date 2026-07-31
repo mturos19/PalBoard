@@ -4,7 +4,9 @@
  * Both sides import these types, so a change to a channel's payload is a
  * compile error rather than a runtime surprise.
  */
-import type { DashboardStats, SaveSnapshot } from './domain'
+import type { DashboardStats, HistoryPoint, SaveSnapshot } from './domain'
+
+export type ExportKind = 'pals-csv' | 'pals-json' | 'items-csv'
 
 export interface WorldCandidate {
   path: string
@@ -38,6 +40,8 @@ export const IPC = {
   browseForWorld: 'palboard:browse-for-world',
   reload: 'palboard:reload',
   revealSaveFolder: 'palboard:reveal-save-folder',
+  getHistory: 'palboard:get-history',
+  exportData: 'palboard:export-data',
   /** Main -> renderer push whenever state changes. */
   stateChanged: 'palboard:state-changed',
 } as const
@@ -50,6 +54,10 @@ export interface PalBoardApi {
   browseForWorld(): Promise<SyncState>
   reload(): Promise<SyncState>
   revealSaveFolder(): Promise<void>
+  /** Time-series recorded by PalBoard for the current world. */
+  getHistory(): Promise<HistoryPoint[]>
+  /** Opens a save dialog and writes the export; resolves to the path or null. */
+  exportData(kind: ExportKind): Promise<string | null>
   /** Subscribes to state pushes. Returns an unsubscribe function. */
   onStateChanged(listener: (state: SyncState) => void): () => void
 }

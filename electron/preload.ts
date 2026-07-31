@@ -6,7 +6,14 @@
  * PalBoard is read-only by design, so nothing here can write to a save.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import { IPC, type PalBoardApi, type SyncState, type WorldCandidate } from '../shared/ipc'
+import {
+  IPC,
+  type ExportKind,
+  type PalBoardApi,
+  type SyncState,
+  type WorldCandidate,
+} from '../shared/ipc'
+import type { HistoryPoint } from '../shared/domain'
 
 const api: PalBoardApi = {
   getState: () => ipcRenderer.invoke(IPC.getState) as Promise<SyncState>,
@@ -15,6 +22,9 @@ const api: PalBoardApi = {
   browseForWorld: () => ipcRenderer.invoke(IPC.browseForWorld) as Promise<SyncState>,
   reload: () => ipcRenderer.invoke(IPC.reload) as Promise<SyncState>,
   revealSaveFolder: () => ipcRenderer.invoke(IPC.revealSaveFolder) as Promise<void>,
+  getHistory: () => ipcRenderer.invoke(IPC.getHistory) as Promise<HistoryPoint[]>,
+  exportData: (kind: ExportKind) =>
+    ipcRenderer.invoke(IPC.exportData, kind) as Promise<string | null>,
   onStateChanged: (listener) => {
     const handler = (_event: IpcRendererEvent, state: SyncState) => listener(state)
     ipcRenderer.on(IPC.stateChanged, handler)

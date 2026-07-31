@@ -14,6 +14,10 @@ import { parseGvas } from '../gvas/parser'
 import type { GvasFile, MapEntry, PropStruct, PropValue } from '../gvas/types'
 import { fullParsePlan, levelParsePlan } from './hints'
 import { decodeBaseCamp, decodeCharacter, decodeGroup } from './rawdata'
+import { buildInventories } from './inventory'
+import { buildRecords } from './records'
+import { SANITY_CONCERN, buildAlerts } from './alerts'
+import { isHumanCharacter, speciesInfo } from '../../../shared/gamedata/species'
 import type {
   BaseCamp,
   DashboardStats,
@@ -21,6 +25,7 @@ import type {
   Guild,
   MapCoord,
   Pal,
+  PalElement,
   PalLocation,
   Player,
   SaveSnapshot,
@@ -281,6 +286,33 @@ export function buildSnapshot(
     }
   }
 
+  // --- inventory, records, alerts ----------------------------------------------
+  const playerNames = new Map(players.map((p) => [p.uid.toLowerCase(), p.name]))
+  const { inventories, storage, resources } = buildInventories(
+    wsd,
+    input.playerSaves,
+    playerNames,
+    warnings,
+  )
+  const records = buildRecords(input.playerSaves, playerNames)
+
+  // Palbox usage: capacity from the container declarations, usage from where
+  // the pals actually live.
+  let palboxCapacity = 0
+  for (const entry of (wsd.CharacterContainerSaveData as MapEntry[] | undefined) ?? []) {
+    const key = asStruct(entry.key)
+    const id = str(asStruct(key?.ID)?.ID) ?? str(key?.ID)
+    const slotNum = num(asStruct(entry.value)?.SlotNum, 0)
+    if (id && palboxContainers.has(id)) palboxCapacity += slotNum
+  }
+  const palboxUsed = pals.filter((p) => p.location === 'palbox').length
+  const alerts = buildAlerts({
+    pals,
+    bases,
+    storage,
+    palbox: palboxCapacity > 0 ? { used: palboxUsed, capacity: palboxCapacity } : null,
+  })
+
   const buildMs = performance.now() - t0
   return {
     revision: 0,
@@ -291,6 +323,11 @@ export function buildSnapshot(
     players,
     pals,
     bases,
+    inventories,
+    storage,
+    resources,
+    records,
+    alerts,
     diagnostics: {
       format: timings.format,
       compressedBytes: timings.compressedBytes,
@@ -367,6 +404,7 @@ function buildPlayer(
     if (name) statusPoints[name] = num(s?.StatusPoint, 0)
   }
 
+  const location = (asStruct(p.LastJumpedLocation) as unknown as Vec3 | undefined) ?? null
   return {
     uid,
     instanceId,
@@ -377,7 +415,8 @@ function buildPlayer(
     maxHp: null,
     stomach: num(p.FullStomach, 100),
     statusPoints,
-    location: (asStruct(p.LastJumpedLocation) as unknown as Vec3 | undefined) ?? null,
+    location,
+    coord: location ? worldToMap(location) : null,
     guildId: groupId || null,
     technologyPoints: sd ? num(sd.TechnologyPoint, 0) : null,
     ancientTechnologyPoints: sd ? num(sd.bossTechnologyPoint, 0) : null,
@@ -396,6 +435,7 @@ function buildPal(p: PropStruct, instanceId: string, idx: ContainerIndex): Pal {
   const isAlpha = ALPHA_PREFIX.test(characterId)
   const isTowerBoss = TOWER_PREFIX.test(characterId)
   const speciesId = characterId.replace(ALPHA_PREFIX, '').replace(TOWER_PREFIX, '')
+  const info = speciesInfo(speciesId)
 
   const slot = asStruct(p.SlotId)
   const containerId = wrappedId(slot?.ContainerId) ?? ''
@@ -430,7 +470,9 @@ function buildPal(p: PropStruct, instanceId: string, idx: ContainerIndex): Pal {
     instanceId,
     characterId,
     speciesId,
-    speciesName: humaniseSpecies(speciesId),
+    speciesName: info?.name ?? humaniseSpecies(speciesId),
+    elements: (info?.elements ?? []) as PalElement[],
+    isHuman: isHumanCharacter(speciesId),
     nickname: str(p.NickName),
     gender: parseGender(p.Gender),
     level: num(p.Level, 1),
@@ -473,15 +515,10 @@ function buildPal(p: PropStruct, instanceId: string, idx: ContainerIndex): Pal {
   }
 }
 
-/**
- * Sanity below this counts as depressed. Palworld starts applying work-speed
- * penalties well before a pal is formally "depressed", so this is deliberately
- * an early warning rather than the game's own threshold.
- */
-export const SANITY_CONCERN = 50
+export { SANITY_CONCERN }
 
 export function computeStats(snapshot: SaveSnapshot): DashboardStats {
-  const owned = snapshot.pals.filter((p) => !p.isTowerBoss)
+  const owned = snapshot.pals.filter((p) => !p.isTowerBoss && !p.isHuman)
   const species = new Set<string>()
   let alpha = 0
   let lucky = 0
