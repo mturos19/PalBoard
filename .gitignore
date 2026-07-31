@@ -17,3 +17,6 @@ Thumbs.db
 
 # Never commit save data — it contains player names and world state.
 *.sav
+
+# TypeScript incremental build info
+*.tsbuildinfo
