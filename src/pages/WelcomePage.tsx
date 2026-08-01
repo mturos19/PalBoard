@@ -11,6 +11,7 @@ export function WelcomePage() {
   const error = useSyncStore((s) => s.error)
   const selectWorld = useSyncStore((s) => s.selectWorld)
   const browseForWorld = useSyncStore((s) => s.browseForWorld)
+  const rescanWorlds = useSyncStore((s) => s.rescanWorlds)
 
   return (
     <div className="flex h-full items-center justify-center bg-canvas p-8">
@@ -77,7 +78,7 @@ export function WelcomePage() {
             Choose save folder
           </button>
           <button
-            onClick={() => void window.palboard.discoverWorlds()}
+            onClick={() => void rescanWorlds()}
             title="Scan again"
             className="flex items-center justify-center gap-2 rounded-lg border border-line-soft bg-surface px-3 py-2.5 text-sm text-ink-muted transition-colors hover:border-line hover:text-ink"
           >

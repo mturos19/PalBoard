@@ -63,10 +63,38 @@ const MAGIC_PLZ = 'PlZ'
 const MAGIC_PLM = 'PlM'
 const MAGIC_CNK = 'CNK'
 
+/**
+ * Ceiling on a declared decompressed size, in bytes.
+ *
+ * Both codecs allocate the output buffer from a 32-bit header field before a
+ * single byte is verified, so a corrupt header is an allocation request of up to
+ * 4 GiB. A real Level.sav decompresses to tens of megabytes; 1 GiB leaves two
+ * orders of magnitude of headroom while keeping a bad header an error rather
+ * than an out-of-memory kill.
+ */
+const MAX_DECOMPRESSED_BYTES = 1024 * 1024 * 1024
+
 export class SaveFormatError extends Error {
-  constructor(message: string) {
-    super(message)
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
     this.name = 'SaveFormatError'
+  }
+}
+
+/**
+ * Runs zlib inflate with a hard output cap, translating any failure into a
+ * {@link SaveFormatError}.
+ *
+ * Without `maxOutputLength`, zlib grows its output buffer to whatever the stream
+ * asks for, so a malformed or hostile payload decompresses until the process
+ * dies. The cap is the size the header already promised, which makes a
+ * disagreement a clean error instead of unbounded memory growth.
+ */
+function inflate(payload: Buffer, maxOutputLength: number, what: string): Buffer {
+  try {
+    return inflateSync(payload, { maxOutputLength })
+  } catch (err) {
+    throw new SaveFormatError(`${what} failed to decompress: ${(err as Error).message}`, { cause: err })
   }
 }
 
@@ -123,6 +151,12 @@ export async function decompressSave(data: Buffer): Promise<SaveContainer> {
     )
   }
 
+  if (uncompressedLen > MAX_DECOMPRESSED_BYTES || compressedLen > MAX_DECOMPRESSED_BYTES) {
+    throw new SaveFormatError(
+      `save header declares an implausible size (${compressedLen} compressed, ${uncompressedLen} decompressed); refusing to allocate it`,
+    )
+  }
+
   const rest = data.subarray(dataOffset)
 
   /**
@@ -146,20 +180,27 @@ export async function decompressSave(data: Buffer): Promise<SaveContainer> {
   if (magic === MAGIC_PLM) {
     // Oodle. The codec needs the exact decompressed size up front.
     const oozDecompress = await loadOodle()
-    const out = oozDecompress(new Uint8Array(onDiskPayload()), uncompressedLen)
+    let out: Uint8Array
+    try {
+      out = oozDecompress(new Uint8Array(onDiskPayload()), uncompressedLen)
+    } catch (err) {
+      throw new SaveFormatError(`Oodle payload failed to decompress: ${(err as Error).message}`, { cause: err })
+    }
     gvas = Buffer.from(out.buffer, out.byteOffset, out.length)
     codec = 'oodle'
   } else if (saveType === 0x32) {
-    const once = inflateSync(rest)
+    // The outer pass yields the intermediate stream, whose length the header
+    // records as `compressedLen` — not the final GVAS size.
+    const once = inflate(rest, compressedLen, 'double-zlib outer pass')
     if (once.length !== compressedLen) {
       throw new SaveFormatError(
         `double-zlib inner length mismatch: expected ${compressedLen}, got ${once.length}`,
       )
     }
-    gvas = inflateSync(once)
+    gvas = inflate(once, uncompressedLen, 'double-zlib inner pass')
     codec = 'zlib-double'
   } else if (saveType === 0x31 || saveType === 0x30) {
-    gvas = inflateSync(onDiskPayload())
+    gvas = inflate(onDiskPayload(), uncompressedLen, 'zlib payload')
     codec = 'zlib'
   } else {
     throw new SaveFormatError(`unknown save type byte 0x${saveType.toString(16)}`)

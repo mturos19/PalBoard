@@ -10,7 +10,7 @@
  * Only Level.sav is required. Everything else degrades gracefully so a partial
  * or in-progress save still renders instead of failing the whole load.
  */
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { decompressSave } from './compression'
 import { parseGvas } from './gvas/parser'
@@ -33,10 +33,12 @@ interface DecodeResult {
   decompressMs: number
   parseMs: number
   format: string
+  /** Last-modified time of the file on disk, in epoch milliseconds. */
+  modifiedAt: number
 }
 
 async function decodeSave(path: string, isLevel: boolean, warnings: string[]): Promise<DecodeResult> {
-  const raw = await readFile(path)
+  const [raw, stats] = await Promise.all([readFile(path), stat(path)])
 
   const t0 = performance.now()
   const container = await decompressSave(raw)
@@ -63,6 +65,7 @@ async function decodeSave(path: string, isLevel: boolean, warnings: string[]): P
     decompressMs,
     parseMs,
     format: `${container.magic}/${container.codec}`,
+    modifiedAt: stats.mtimeMs,
   }
 }
 
@@ -119,6 +122,7 @@ export async function loadWorld(worldDir: string): Promise<SaveSnapshot> {
       meta,
       playerSaves,
       warnings,
+      levelModifiedAt: level.modifiedAt,
     },
     {
       decompressMs: level.decompressMs,

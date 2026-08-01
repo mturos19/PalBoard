@@ -151,8 +151,11 @@ export class FArchiveReader {
     const len = this.i32()
     if (len === 0) return ''
     if (len < 0) {
-      const chars = -len
-      const byteLen = chars * 2
+      // -2^31 has no positive counterpart; reject before it wraps negative.
+      if (len === -0x8000_0000) {
+        throw new RangeError(`FArchiveReader: implausible FString length ${len} at ${this.offset - 4}`)
+      }
+      const byteLen = -len * 2
       this.need(byteLen)
       // Trim the 2-byte null terminator.
       const s = this.buf.toString('utf16le', this.offset, this.offset + byteLen - 2)
@@ -212,17 +215,36 @@ export class FArchiveReader {
     return { rotation: this.quat(), translation: this.vector(), scale3d: this.vector() }
   }
 
-  /** TArray<T>: a u32 count followed by `count` elements. */
-  tarray<T>(read: (r: FArchiveReader) => T): T[] {
-    const count = this.u32()
+  /**
+   * Reads a u32 element count, rejecting any value the remaining bytes could not
+   * possibly supply.
+   *
+   * This guard matters more than it looks. A count is four bytes of untrusted
+   * data, and every container here follows it with `new Array(count)`; a corrupt
+   * or truncated save reaching that line with a count near 2^32 exhausts memory
+   * before the first element read can fail. Bounding it turns an OOM crash into
+   * a recoverable parse error the plan can skip past.
+   *
+   * @param minBytesPerElement smallest on-disk size of one element
+   */
+  count(minBytesPerElement = 1): number {
+    const at = this.offset
+    const n = this.u32()
+    const max = Math.floor(this.remaining / Math.max(1, minBytesPerElement))
+    if (n > max) {
+      throw new RangeError(
+        `FArchiveReader: element count ${n} at ${at} exceeds the ${max} that fit in ${this.remaining} remaining bytes`,
+      )
+    }
+    return n
+  }
+
+  /** TArray<T>: a bounded u32 count followed by `count` elements. */
+  tarray<T>(read: (r: FArchiveReader) => T, minBytesPerElement = 1): T[] {
+    const count = this.count(minBytesPerElement)
     const out: T[] = new Array(count)
     for (let i = 0; i < count; i++) out[i] = read(this)
     return out
-  }
-
-  /** Creates an independent reader over a nested byte payload (Palworld RawData). */
-  child(buf: Buffer): FArchiveReader {
-    return new FArchiveReader(buf)
   }
 }
 

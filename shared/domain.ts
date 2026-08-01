@@ -166,6 +166,16 @@ export interface Pal {
 
 export type PalLocation = 'party' | 'palbox' | 'base' | 'cage' | 'unknown'
 
+/**
+ * Sanity below this counts as "low".
+ *
+ * Palworld applies work penalties well before a pal is formally depressed, so
+ * this is an early warning rather than the game's own threshold. It lives in the
+ * shared layer because the alert rules, the dashboard roll-up and the tables all
+ * have to agree on it — three copies of `50` would drift apart silently.
+ */
+export const SANITY_CONCERN = 50
+
 export interface BaseCamp {
   id: string
   /** Generated label; Palworld does not let players name bases. */

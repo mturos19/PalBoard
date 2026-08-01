@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { useRestoreFocus } from '@/lib/useRestoreFocus'
 
 /** Right-hand slide-over panel. Esc or backdrop click closes. */
 export function Drawer({
@@ -15,6 +16,8 @@ export function Drawer({
   children: ReactNode
   width?: string
 }) {
+  useRestoreFocus(open)
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -32,7 +35,7 @@ export function Drawer({
       <aside
         className={`animate-slide-in absolute inset-y-0 right-0 flex ${width} max-w-[92vw] flex-col border-l border-line bg-surface card-shadow`}
         role="dialog"
-        aria-modal
+        aria-modal="true"
       >
         <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line-soft px-4">
           <div className="min-w-0 flex-1">{title}</div>

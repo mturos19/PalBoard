@@ -44,11 +44,8 @@ export function parseGvasHeader(r: FArchiveReader): GvasHeader {
   const engineVersionBranch = r.fstring()
   const customVersionFormat = r.u32()
 
-  const customVersionCount = r.u32()
-  const customVersions = new Array(customVersionCount)
-  for (let i = 0; i < customVersionCount; i++) {
-    customVersions[i] = { guid: r.guid(), version: r.i32() }
-  }
+  // 16-byte GUID + int32 per entry; bounded so a corrupt count cannot allocate.
+  const customVersions = r.tarray((rr) => ({ guid: rr.guid(), version: rr.i32() }), 20)
 
   const saveGameClassName = r.fstring()
 
@@ -190,7 +187,7 @@ class GvasReader {
         r.optionalGuid()
         return this.maybeSkip(size, path, () => {
           r.u32() // count of removed elements — always 0 in save data
-          const count = r.u32()
+          const count = r.count()
           const structType = elemType === 'StructProperty' ? this.hintFor(path, 'Guid') : ''
           const out: PropValue[] = new Array(count)
           for (let i = 0; i < count; i++) {
@@ -209,9 +206,30 @@ class GvasReader {
         // Unknown property type: trust the declared size and skip it rather than
         // corrupting the read position for every property that follows.
         this.plan.onUnknownType?.(path, `unknown:${typeName}`)
-        r.skip(size)
+        r.seek(this.endOf(size, path))
         return null
     }
+  }
+
+  /**
+   * Resolves a property's declared end offset, rejecting sizes that run past the
+   * buffer.
+   *
+   * `size` is eight bytes of untrusted data. Every recovery path here works by
+   * seeking to `offset + size`, so a nonsensical value would turn the parser's
+   * safety net into the thing that throws — and it would throw a bare
+   * `RangeError` from inside a `catch`, escaping the recovery entirely. Checking
+   * up front keeps the failure a typed, path-tagged parse error.
+   */
+  private endOf(size: number, path: string): number {
+    const end = this.r.offset + size
+    if (!Number.isSafeInteger(size) || size < 0 || end > this.r.buf.length) {
+      throw new GvasParseError(
+        `declared property size ${size} at offset ${this.r.offset} runs past the ${this.r.buf.length}-byte buffer`,
+        path,
+      )
+    }
+    return end
   }
 
   /**
@@ -224,7 +242,7 @@ class GvasReader {
    * that one subtree, not the entire save.
    */
   private maybeSkip(size: number, path: string, parse: () => PropValue): PropValue {
-    const end = this.r.offset + size
+    const end = this.endOf(size, path)
 
     if (this.skip.has(path)) {
       this.r.seek(end)
@@ -266,7 +284,7 @@ class GvasReader {
 
   private arrayProperty(arrayType: string, payloadSize: number, path: string): PropValue {
     const r = this.r
-    const count = r.u32()
+    const count = r.count()
 
     if (arrayType === 'StructProperty') {
       // Struct arrays repeat a full property header once, then pack the values.
@@ -321,7 +339,8 @@ class GvasReader {
   private mapProperty(keyType: string, valueType: string, path: string): PropValue {
     const r = this.r
     r.u32() // unknown/reserved, always 0
-    const count = r.u32()
+    // A key and a value cannot both fit in fewer than two bytes.
+    const count = r.count(2)
 
     const keyPath = `${path}.Key`
     const valuePath = `${path}.Value`

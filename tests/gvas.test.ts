@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FArchiveReader } from '../electron/parser/gvas/reader'
-import { parseGvas, parseProperties } from '../electron/parser/gvas/parser'
+import { GvasParseError, parseGvas, parseProperties } from '../electron/parser/gvas/parser'
 import { GvasBuilder, withGvasHeader } from './helpers/gvasBuilder'
 
 describe('FArchiveReader', () => {
@@ -29,6 +29,30 @@ describe('FArchiveReader', () => {
   it('throws rather than returning garbage when the buffer is short', () => {
     const r = new FArchiveReader(Buffer.alloc(2))
     expect(() => r.u32()).toThrow(/exceeds buffer length/)
+  })
+
+  it('refuses an element count larger than the remaining bytes could supply', () => {
+    // Four bytes of 0xff is a count of 4.29 billion. Reaching `new Array(n)`
+    // with that exhausts memory long before any element read can fail.
+    const r = new FArchiveReader(Buffer.from([0xff, 0xff, 0xff, 0xff, 1, 2, 3, 4]))
+    expect(() => r.tarray((rr) => rr.u8())).toThrow(/exceeds the .* that fit/)
+  })
+
+  it('reads a plausible array normally', () => {
+    const buf = new GvasBuilder().u32(3).u8(7).u8(8).u8(9).build()
+    expect(new FArchiveReader(buf).tarray((r) => r.u8())).toEqual([7, 8, 9])
+  })
+
+  it('accounts for element width when bounding a count', () => {
+    // 4 GUIDs claimed, but only 16 bytes follow — enough for one.
+    const buf = new GvasBuilder().u32(4).raw(Buffer.alloc(16)).build()
+    expect(() => new FArchiveReader(buf).tarray((r) => r.guid(), 16)).toThrow(/exceeds the 1 /)
+  })
+
+  it('rejects the FString length that has no positive counterpart', () => {
+    // -2^31 negated is still -2^31, so a naive `-len` would read backwards.
+    const buf = new GvasBuilder().i32(-0x80000000).build()
+    expect(() => new FArchiveReader(buf).fstring()).toThrow(/implausible FString length/)
   })
 
   it('skips an absent optional GUID as a single byte', () => {
@@ -201,6 +225,67 @@ describe('resilience to format drift', () => {
     expect(props.Mystery).toBeNull()
     expect(props.Day).toBe(136)
     expect(onUnknownType).toHaveBeenCalledWith('.Mystery', 'unknown:SomeFutureProperty')
+  })
+
+  it('rejects a declared property size that runs past the buffer', () => {
+    // The recovery path works by seeking to offset+size, so a size the buffer
+    // cannot contain has to fail as a typed parse error rather than as a bare
+    // RangeError thrown from inside the recovery itself.
+    const body = new GvasBuilder()
+      .str('Huge')
+      .str('StructProperty')
+      .u64(0xffff_ffff)
+      .str('SomeStruct')
+      .guid()
+      .noGuid()
+      .build()
+
+    expect(() => parseProperties(new FArchiveReader(body))).toThrow(GvasParseError)
+    expect(() => parseProperties(new FArchiveReader(body))).toThrow(/runs past the/)
+  })
+
+  it('contains an oversized nested size to its own subtree', () => {
+    const onError = vi.fn()
+    // An outer struct whose size is honest, wrapping an inner one that lies.
+    const inner = new GvasBuilder()
+      .str('Inner')
+      .str('StructProperty')
+      .u64(0xffff_ffff)
+      .str('SomeStruct')
+      .guid()
+      .noGuid()
+      .build()
+
+    const body = new GvasBuilder()
+      .property('Outer', 'StructProperty', (h) => h.str('SomeStruct').guid().noGuid(), (v) =>
+        v.raw(inner),
+      )
+      .simple('Day', 'IntProperty', (v) => v.i32(136))
+      .none()
+      .build()
+
+    const props = parseProperties(new FArchiveReader(body), { onError })
+
+    expect(props.Outer).toBeNull()
+    expect(onError.mock.calls[0][0]).toBe('.Outer')
+    // The bad subtree costs one property, not the rest of the save.
+    expect(props.Day).toBe(136)
+  })
+
+  it('refuses a map entry count the payload could not hold', () => {
+    const body = new GvasBuilder()
+      .property('Bomb', 'MapProperty', (h) => h.str('IntProperty').str('IntProperty').noGuid(), (v) =>
+        v.u32(0).u32(0xffff_ffff),
+      )
+      .simple('Day', 'IntProperty', (v) => v.i32(136))
+      .none()
+      .build()
+
+    const onError = vi.fn()
+    const props = parseProperties(new FArchiveReader(body), { onError })
+    expect(props.Bomb).toBeNull()
+    expect(onError).toHaveBeenCalledOnce()
+    expect(props.Day).toBe(136)
   })
 
   it('reports map key/value types it had to guess', () => {

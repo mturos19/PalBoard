@@ -50,7 +50,10 @@ export function categorise(id: string): ItemCategory {
   if (l.startsWith('blueprint_')) return 'schematics'
   if (l.startsWith('palegg')) return 'eggs'
   if (l.startsWith('palsphere') || l.startsWith('keysphere') || l.startsWith('spheremodule')) return 'spheres'
-  if (l.includes('bullet') || l.includes('arrow') || l.includes('grenade') && !l.includes('launcher')) return 'ammo'
+  // Grenade launchers are weapons; grenades are ammunition.
+  if (l.includes('bullet') || l.includes('arrow') || (l.includes('grenade') && !l.includes('launcher'))) {
+    return 'ammo'
+  }
   if (
     l.startsWith('treasure') || l.startsWith('salvage_') || l.startsWith('key') ||
     l.includes('whalewhistle') || l.startsWith('palsummon')

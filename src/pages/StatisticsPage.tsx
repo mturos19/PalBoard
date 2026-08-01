@@ -218,6 +218,14 @@ function IvHistogram({ pals }: { pals: Pal[] }) {
 
 const dayLabel = (t: number) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
+/** Resource lines on the over-time chart. Module scope keeps the memo honest. */
+const RESOURCE_SERIES = [
+  { key: 'wood', color: '#d9a05b' },
+  { key: 'stone', color: '#b9c0cf' },
+  { key: 'ore', color: '#4b9cff' },
+  { key: 'ingots', color: '#f5b23d' },
+] as const
+
 function HistoryLines({
   points,
   series,
@@ -242,10 +250,12 @@ function HistoryLines({
 }
 
 function ResourceHistory({ points }: { points: Array<{ t: number; resources: Record<string, number> }> }) {
-  const keys = ['wood', 'stone', 'ore', 'ingots'] as const
-  const colors = ['#d9a05b', '#b9c0cf', '#4b9cff', '#f5b23d']
   const data = useMemo(
-    () => points.map((p) => ({ t: p.t, ...Object.fromEntries(keys.map((k) => [k, p.resources?.[k] ?? 0])) })),
+    () =>
+      points.map((p) => ({
+        t: p.t,
+        ...Object.fromEntries(RESOURCE_SERIES.map(({ key }) => [key, p.resources?.[key] ?? 0])),
+      })),
     [points],
   )
   if (points.length < 2) return <HistoryPlaceholder count={points.length} />
@@ -256,10 +266,16 @@ function ResourceHistory({ points }: { points: Array<{ t: number; resources: Rec
         <XAxis dataKey="t" tickFormatter={dayLabel} tick={{ fill: INK_FAINT, fontSize: 10 }} axisLine={{ stroke: LINE }} tickLine={false} />
         <YAxis tick={{ fill: INK_FAINT, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
         <Tooltip {...tooltipStyle} labelFormatter={(t) => new Date(Number(t)).toLocaleString()} />
-        {keys.map((k, i) => {
-          const group = RESOURCE_GROUPS.find((g) => g.key === k)
-          return <Line key={k} dataKey={k} name={group?.label ?? k} stroke={colors[i]} strokeWidth={2} dot={false} />
-        })}
+        {RESOURCE_SERIES.map(({ key, color }) => (
+          <Line
+            key={key}
+            dataKey={key}
+            name={RESOURCE_GROUPS.find((g) => g.key === key)?.label ?? key}
+            stroke={color}
+            strokeWidth={2}
+            dot={false}
+          />
+        ))}
       </LineChart>
     </ResponsiveContainer>
   )

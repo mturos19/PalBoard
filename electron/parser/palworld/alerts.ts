@@ -6,14 +6,8 @@
  * Ids are stable across reloads; the renderer diffs them to decide what is
  * new enough to raise an OS notification for.
  */
+import { SANITY_CONCERN } from '../../../shared/domain'
 import type { Alert, BaseCamp, Pal, StorageSummary } from '../../../shared/domain'
-
-/**
- * Sanity below this counts as "low". Palworld applies work penalties well
- * before a pal is formally depressed, so this is an early warning, not the
- * game's own threshold. Shared with the dashboard stats roll-up.
- */
-export const SANITY_CONCERN = 50
 
 const PALBOX_WARN_RATIO = 0.9
 

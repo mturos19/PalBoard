@@ -16,7 +16,7 @@ import { computeStats } from '../parser/palworld/model'
 import { SaveWatcher } from '../watcher'
 import { HistoryStore } from './history'
 import { loadPrefs, savePrefs } from './prefs'
-import type { SyncState } from '../../shared/ipc'
+import type { SyncState, WorldCandidate } from '../../shared/ipc'
 import type { HistoryPoint } from '../../shared/domain'
 
 export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
@@ -37,10 +37,13 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
   private loading = false
   /** Set when a save write arrives mid-parse; triggers exactly one re-run. */
   private reloadQueued = false
+  /** Incremented per world selection, so a late one cannot overwrite a newer. */
+  private selection = 0
 
   constructor() {
     super()
     this.watcher.on('change', () => {
+      // Errors are already folded into state by reload(); nothing to add here.
       void this.reload()
     })
     this.watcher.on('error', (err) => {
@@ -62,7 +65,7 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
    * falling back to the most recently played.
    */
   async initialise(): Promise<SyncState> {
-    const worlds = await discoverWorlds()
+    const worlds = await this.scanWorlds()
     this.patch({ worlds })
     const remembered = loadPrefs().lastWorldPath
     const target =
@@ -73,6 +76,16 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
     return this.current
   }
 
+  /** Disk scan that reports failure as state rather than as a rejection. */
+  private async scanWorlds(): Promise<WorldCandidate[]> {
+    try {
+      return await discoverWorlds()
+    } catch (err) {
+      this.patch({ error: `could not scan for save folders: ${asError(err).message}` })
+      return this.current.worlds
+    }
+  }
+
   /** History points recorded for the currently open world. */
   async getHistory(): Promise<HistoryPoint[]> {
     const worldId = this.current.snapshot?.world.worldId
@@ -80,16 +93,23 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
   }
 
   async refreshWorldList(): Promise<SyncState> {
-    this.patch({ worlds: await discoverWorlds() })
+    this.patch({ worlds: await this.scanWorlds() })
     return this.current
   }
 
   /**
    * Switches to a world folder and begins watching it.
    * Accepts a world folder or its parent; see {@link resolveWorldFolder}.
+   *
+   * Concurrent calls are resolved last-one-wins: each selection takes a token,
+   * and an older selection that finishes late abandons its result rather than
+   * dragging the UI back to a world the user already navigated away from.
    */
   async selectWorld(path: string): Promise<SyncState> {
+    const token = ++this.selection
     const resolved = await resolveWorldFolder(path)
+    if (token !== this.selection) return this.current
+
     if (!resolved) {
       this.patch({
         status: 'error',
@@ -100,12 +120,25 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
 
     this.patch({ worldPath: resolved.path, status: 'loading', error: null })
     savePrefs({ lastWorldPath: resolved.path })
-    await this.watcher.start(resolved.path)
+
+    try {
+      await this.watcher.start(resolved.path)
+    } catch (err) {
+      // Losing the watcher costs live updates, not the world itself: parse it
+      // anyway and let the user reload by hand.
+      this.patch({ error: `watcher: ${asError(err).message}` })
+    }
+    if (token !== this.selection) return this.current
+
     await this.reload()
     return this.current
   }
 
-  /** Re-parses the current world. Safe to call concurrently. */
+  /**
+   * Re-parses the current world. Safe to call concurrently: a call arriving
+   * while a parse is in flight schedules exactly one re-run rather than queueing
+   * a parse per save write.
+   */
   async reload(): Promise<SyncState> {
     if (!this.current.worldPath) return this.current
 
@@ -120,20 +153,37 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
     try {
       do {
         this.reloadQueued = false
-        const snapshot = await loadWorld(this.current.worldPath)
-        snapshot.revision = ++this.revision
-        this.patch({
-          status: 'ready',
-          snapshot,
-          stats: computeStats(snapshot),
-          error: null,
-          lastSyncedAt: Date.now(),
-        })
-        // Record the time-series point after the UI has the fresh state.
-        await this.history.append(snapshot).catch(() => {})
+        const worldPath: string | null = this.current.worldPath
+        if (!worldPath) break
+
+        try {
+          const snapshot = await loadWorld(worldPath)
+
+          // The world changed while we parsed: this snapshot describes a save
+          // the user is no longer looking at, so drop it and parse the new one.
+          if (this.current.worldPath !== worldPath) {
+            this.reloadQueued = true
+            continue
+          }
+
+          snapshot.revision = ++this.revision
+          this.patch({
+            status: 'ready',
+            snapshot,
+            stats: computeStats(snapshot),
+            error: null,
+            lastSyncedAt: Date.now(),
+          })
+          // Record the time-series point after the UI has the fresh state.
+          await this.history.append(snapshot).catch(() => {})
+        } catch (err) {
+          // Kept inside the loop: a read that lost a race with the game's own
+          // write must not cancel the reload the next change event queued.
+          if (this.current.worldPath === worldPath) {
+            this.patch({ status: 'error', error: asError(err).message })
+          }
+        }
       } while (this.reloadQueued)
-    } catch (err) {
-      this.patch({ status: 'error', error: (err as Error).message })
     } finally {
       this.loading = false
       this.patch({ syncing: false })
@@ -143,7 +193,12 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
   }
 
   async dispose(): Promise<void> {
+    // Bump the token so any parse still in flight discards its result.
+    this.selection++
+    this.watcher.removeAllListeners()
     await this.watcher.stop()
     this.removeAllListeners()
   }
 }
+
+const asError = (err: unknown): Error => (err instanceof Error ? err : new Error(String(err)))

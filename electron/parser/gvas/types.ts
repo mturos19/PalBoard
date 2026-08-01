@@ -39,9 +39,6 @@ export interface LinearColor {
   a: number
 }
 
-/** Sentinel returned for subtrees the parse plan told us to seek past. */
-export const SKIPPED = Symbol('skipped')
-
 export interface GvasCustomVersion {
   guid: string
   version: number

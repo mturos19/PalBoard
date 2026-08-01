@@ -1,7 +1,7 @@
 /** Slide-over with everything the save knows about one pal. */
 import { useMemo } from 'react'
 import { Brain, Heart, MapPin, Star, Sparkles, User, UtensilsCrossed, Zap } from 'lucide-react'
-import type { Pal } from '@shared/domain'
+import { SANITY_CONCERN, type Pal } from '@shared/domain'
 import { skillDisplayName } from '@shared/gamedata/names'
 import { speciesInfo, type WorkKey } from '@shared/gamedata/species'
 import { Drawer } from './ui/Drawer'
@@ -122,7 +122,7 @@ function Body({ pal, baseName, ownerName }: { pal: Pal; baseName: string | null;
             icon={Brain}
             label="Sanity"
             value={`${Math.round(pal.sanity)}%`}
-            tone={pal.sanity < 50 ? 'text-amber' : undefined}
+            tone={pal.sanity < SANITY_CONCERN ? 'text-amber' : undefined}
           />
         </div>
         {pal.sickness ? (

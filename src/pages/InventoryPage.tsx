@@ -28,6 +28,7 @@ type Source = 'storage' | string // player uid
 export function InventoryPage() {
   const storage = useSyncStore((s) => s.snapshot?.storage)
   const inventories = useSyncStore((s) => s.snapshot?.inventories)
+  const exportData = useSyncStore((s) => s.exportData)
   const [searchParams] = useSearchParams()
 
   const [source, setSource] = useState<Source>('storage')
@@ -103,7 +104,7 @@ export function InventoryPage() {
             </SourceTab>
           ))}
           <button
-            onClick={() => void window.palboard.exportData('items-csv')}
+            onClick={() => void exportData('items-csv')}
             title="Export storage as CSV"
             className="ml-auto flex h-8 items-center gap-1.5 rounded-lg border border-line-soft bg-surface px-3 text-xs text-ink-muted transition-colors hover:border-line hover:text-ink"
           >

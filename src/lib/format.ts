@@ -42,11 +42,6 @@ export function formatDateTime(timestamp: number): string {
   })
 }
 
-/** `EPalOptionWorldDifficulty::Custom` is already trimmed to `Custom` upstream. */
-export function titleCase(value: string): string {
-  return value.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-}
-
 /** Joins class names, dropping falsy entries. */
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')

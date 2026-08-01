@@ -5,9 +5,22 @@
 import type { SaveSnapshot } from '../../shared/domain'
 import { itemName, categorise } from '../../shared/gamedata/items'
 
+/**
+ * Leading characters that make a spreadsheet treat a cell as a formula.
+ *
+ * Pal nicknames are free text typed by a player, and a nickname beginning `=` or
+ * `@` is executed on open by Excel, Sheets and LibreOffice alike. Prefixing a
+ * tab neutralises it — the cell still reads as the original text, but it is
+ * unambiguously data.
+ */
+const FORMULA_PREFIX = /^[=+\-@\t\r]/
+
 function csvEscape(value: unknown): string {
-  const s = String(value ?? '')
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  let s = String(value ?? '')
+  // Numbers and booleans are ours, not the player's, so a leading `-` there is a
+  // negative sign rather than an injection attempt.
+  if (typeof value === 'string' && FORMULA_PREFIX.test(s)) s = `\t${s}`
+  return /[",\n\r\t]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 function toCsv(header: string[], rows: unknown[][]): string {

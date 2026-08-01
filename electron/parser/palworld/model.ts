@@ -16,8 +16,9 @@ import { fullParsePlan, levelParsePlan } from './hints'
 import { decodeBaseCamp, decodeCharacter, decodeGroup } from './rawdata'
 import { buildInventories } from './inventory'
 import { buildRecords } from './records'
-import { SANITY_CONCERN, buildAlerts } from './alerts'
+import { buildAlerts } from './alerts'
 import { isHumanCharacter, speciesInfo } from '../../../shared/gamedata/species'
+import { SANITY_CONCERN } from '../../../shared/domain'
 import type {
   BaseCamp,
   DashboardStats,
@@ -111,7 +112,12 @@ export interface MetaSaves {
   worldOption?: GvasFile
 }
 
-function buildWorld(worldId: string, level: GvasFile, meta: MetaSaves): WorldSummary {
+function buildWorld(
+  worldId: string,
+  level: GvasFile,
+  meta: MetaSaves,
+  modifiedAt: number,
+): WorldSummary {
   const metaData = asStruct(meta.levelMeta?.properties.SaveData)
   const settings = asStruct(asStruct(meta.worldOption?.properties.OptionWorldData)?.Settings)
   const h = level.header
@@ -120,8 +126,7 @@ function buildWorld(worldId: string, level: GvasFile, meta: MetaSaves): WorldSum
     worldId,
     name: str(metaData?.WorldName),
     day: metaData ? num(metaData.InGameDay, 0) : null,
-    // UE ticks are 100ns intervals since year 1; convert to a JS epoch.
-    savedAt: ticksToEpochMs(level.properties.Timestamp),
+    savedAt: ticksToEpochMs(level.properties.Timestamp, modifiedAt),
     difficulty: enumTail(settings?.Difficulty),
     playTimeSeconds: null, // not recorded in the save; tracked by PalBoard over time
     engineVersion: `${h.engineVersionMajor}.${h.engineVersionMinor}.${h.engineVersionPatch}`,
@@ -129,10 +134,21 @@ function buildWorld(worldId: string, level: GvasFile, meta: MetaSaves): WorldSum
 }
 
 const TICKS_AT_UNIX_EPOCH = 621355968000000000n
+/** 2010-01-01: earlier than any Palworld save, later than a zeroed field. */
+const EARLIEST_PLAUSIBLE_SAVE_MS = 1262304000000
 
-function ticksToEpochMs(v: PropValue | undefined): number {
-  if (typeof v !== 'bigint') return Date.now()
-  return Number((v - TICKS_AT_UNIX_EPOCH) / 10000n)
+/**
+ * Converts UE ticks (100ns intervals since year 1) to a JS epoch.
+ *
+ * Falls back to the file's own modification time rather than to "now". This
+ * value is the identity of a save write: the history log deduplicates on it, so
+ * a clock-derived fallback would make every reload of the same save look like a
+ * new one and append a duplicate point each time.
+ */
+function ticksToEpochMs(v: PropValue | undefined, fallback: number): number {
+  if (typeof v !== 'bigint') return fallback
+  const ms = Number((v - TICKS_AT_UNIX_EPOCH) / 10000n)
+  return Number.isFinite(ms) && ms > EARLIEST_PLAUSIBLE_SAVE_MS ? ms : fallback
 }
 
 // --- entry point --------------------------------------------------------------
@@ -145,6 +161,8 @@ export interface BuildInput {
   /** Parsed `Players/<uid>.sav` files, keyed by lowercase player UID. */
   playerSaves: Map<string, GvasFile>
   warnings: string[]
+  /** Level.sav's mtime, used when the save itself records no timestamp. */
+  levelModifiedAt: number
 }
 
 /**
@@ -318,7 +336,7 @@ export function buildSnapshot(
     revision: 0,
     loadedAt: Date.now(),
     savePath: input.savePath,
-    world: buildWorld(input.worldId, level, input.meta),
+    world: buildWorld(input.worldId, level, input.meta, input.levelModifiedAt),
     guilds,
     players,
     pals,
@@ -514,8 +532,6 @@ function buildPal(p: PropStruct, instanceId: string, idx: ContainerIndex): Pal {
     currentWork: enumTail(p.CurrentWorkSuitability),
   }
 }
-
-export { SANITY_CONCERN }
 
 export function computeStats(snapshot: SaveSnapshot): DashboardStats {
   const owned = snapshot.pals.filter((p) => !p.isTowerBoss && !p.isHuman)

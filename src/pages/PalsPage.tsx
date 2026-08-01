@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp, Download, Search, Star, Sparkles, X } from 'lucide-react'
-import type { Pal } from '@shared/domain'
+import { SANITY_CONCERN, type Pal } from '@shared/domain'
 import { skillDisplayName } from '@shared/gamedata/names'
 import { EmptyState } from '@/components/ui/Card'
 import { ElementBadge } from '@/components/ui/ElementBadge'
@@ -41,7 +41,7 @@ function matchesFilter(pal: Pal, filter: QuickFilter): boolean {
     case 'hungry':
       return pal.isHungry
     case 'depressed':
-      return pal.sanity < 50
+      return pal.sanity < SANITY_CONCERN
     case 'sick':
       return pal.sickness !== null
     case 'party':
@@ -54,6 +54,7 @@ function matchesFilter(pal: Pal, filter: QuickFilter): boolean {
 export function PalsPage() {
   const pals = useSyncStore((s) => s.snapshot?.pals)
   const bases = useSyncStore((s) => s.snapshot?.bases)
+  const exportData = useSyncStore((s) => s.exportData)
   const openPal = useUiStore((s) => s.openPal)
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -179,7 +180,7 @@ export function PalsPage() {
             {formatNumber(pals.filter((p) => !p.isTowerBoss && !p.isHuman).length)}
           </span>
           <button
-            onClick={() => void window.palboard.exportData('pals-csv')}
+            onClick={() => void exportData('pals-csv')}
             title="Export the pal list as CSV"
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-line-soft bg-surface px-3 text-xs text-ink-muted transition-colors hover:border-line hover:text-ink"
           >
@@ -266,7 +267,7 @@ export function PalsPage() {
                   >
                     {pal.isHungry ? 'hungry' : Math.round(pal.stomach)}
                   </span>
-                  <Meter className="w-16" value={pal.sanity} warn={50} />
+                  <Meter className="w-16" value={pal.sanity} warn={SANITY_CONCERN} />
                   <span className="w-28 truncate text-xs text-ink-muted">
                     {pal.location === 'base' && pal.baseId
                       ? (baseNames.get(pal.baseId) ?? 'Base')

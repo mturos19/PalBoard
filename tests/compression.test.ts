@@ -105,6 +105,46 @@ describe('decompressSave', () => {
     await expect(decompressSave(sav)).rejects.toThrow(/truncated/)
   })
 
+  it('refuses a header that declares an implausible decompressed size', async () => {
+    // Both codecs allocate the output buffer from this field before verifying a
+    // single byte, so a 3 GiB claim must be rejected, not attempted.
+    const sav = container({
+      uncompressedLen: 3 * 1024 * 1024 * 1024,
+      compressedLen: 32,
+      magic: 'PlZ',
+      saveType: 0x31,
+      payload: deflateSync(GVAS_BODY),
+    })
+    await expect(decompressSave(sav)).rejects.toThrow(/implausible size/)
+  })
+
+  it('caps inflation at the size the header promised', async () => {
+    // A highly compressible payload that expands far past its declared size:
+    // without a cap zlib would happily allocate all of it.
+    const bomb = deflateSync(Buffer.alloc(8 * 1024 * 1024, 0))
+    const sav = container({
+      uncompressedLen: 64,
+      compressedLen: bomb.length,
+      magic: 'PlZ',
+      saveType: 0x31,
+      payload: bomb,
+    })
+    await expect(decompressSave(sav)).rejects.toThrow(SaveFormatError)
+  })
+
+  it('reports a corrupt zlib stream as a save format error', async () => {
+    // Raw zlib failures ("incorrect header check") say nothing about saves.
+    const sav = container({
+      uncompressedLen: GVAS_BODY.length,
+      compressedLen: 16,
+      magic: 'PlZ',
+      saveType: 0x31,
+      payload: Buffer.alloc(16, 0x7f),
+    })
+    await expect(decompressSave(sav)).rejects.toThrow(SaveFormatError)
+    await expect(decompressSave(sav)).rejects.toThrow(/failed to decompress/)
+  })
+
   it('detects a decompressed length that disagrees with the header', async () => {
     const payload = deflateSync(GVAS_BODY)
     const sav = container({

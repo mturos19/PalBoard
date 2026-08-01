@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Layers, MapPin, Radius, Users } from 'lucide-react'
+import { SANITY_CONCERN, type Pal } from '@shared/domain'
 import { Card, CardTitle, EmptyState } from '@/components/ui/Card'
 import { StatCard } from '@/components/ui/StatCard'
 import { formatNumber } from '@/lib/format'
@@ -16,7 +17,7 @@ export function BasesPage() {
   const pals = useSyncStore((s) => s.snapshot?.pals)
 
   const workersByBase = useMemo(() => {
-    const map = new Map<string, typeof pals extends undefined ? never : NonNullable<typeof pals>>()
+    const map = new Map<string, Pal[]>()
     for (const pal of pals ?? []) {
       if (pal.location !== 'base' || !pal.baseId) continue
       const list = map.get(pal.baseId) ?? []
@@ -36,7 +37,7 @@ export function BasesPage() {
       {bases.map((base, i) => {
         const workers = workersByBase.get(base.id) ?? []
         const hungry = workers.filter((p) => p.isHungry).length
-        const depressed = workers.filter((p) => p.sanity < 50).length
+        const depressed = workers.filter((p) => p.sanity < SANITY_CONCERN).length
         const sick = workers.filter((p) => p.sickness !== null).length
 
         return (
@@ -78,12 +79,14 @@ export function BasesPage() {
                   {workers.map((pal) => (
                     <span
                       key={pal.instanceId}
-                      title={`Lv ${pal.level} · food ${Math.round(pal.stomach)}% · sanity ${Math.round(pal.sanity)}%`}
+                      title={`Lv ${pal.level} · ${pal.isHungry ? 'hungry' : 'fed'} · sanity ${Math.round(pal.sanity)}%`}
                       className="rounded-md border border-line-soft bg-surface-2 px-2 py-1 text-[11px] text-ink-muted"
                     >
                       {pal.nickname ?? pal.speciesName}
                       {pal.sickness ? <span className="ml-1 text-rose">●</span> : null}
-                      {!pal.sickness && pal.stomach < 50 ? (
+                      {/* Stomach maxima vary by species, so only the game's own
+                          hunger flag can say whether a pal needs feeding. */}
+                      {!pal.sickness && pal.isHungry ? (
                         <span className="ml-1 text-amber">●</span>
                       ) : null}
                     </span>

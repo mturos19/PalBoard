@@ -13,6 +13,7 @@ import type { LucideIcon } from 'lucide-react'
 import { itemName } from '@shared/gamedata/items'
 import { skillDisplayName } from '@shared/gamedata/names'
 import { cx, formatNumber } from '@/lib/format'
+import { useRestoreFocus } from '@/lib/useRestoreFocus'
 import { useSyncStore } from '@/stores/syncStore'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -52,12 +53,16 @@ export function CommandPalette() {
   const openPal = useUiStore((s) => s.openPal)
   const snapshot = useSyncStore((s) => s.snapshot)
   const reload = useSyncStore((s) => s.reload)
+  const exportData = useSyncStore((s) => s.exportData)
+  const revealSaveFolder = useSyncStore((s) => s.revealSaveFolder)
   const navigate = useNavigate()
 
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  useRestoreFocus(open)
 
   useEffect(() => {
     if (open) {
@@ -81,8 +86,8 @@ export function CommandPalette() {
       { id: 'p-stats', label: 'Statistics', hint: 'Page', icon: BarChart3, keywords: 'charts graphs history', run: go('/statistics') },
       { id: 'p-settings', label: 'Settings', hint: 'Page', icon: Settings, keywords: 'preferences world', run: go('/settings') },
       { id: 'a-reload', label: 'Reload save now', hint: 'Action', icon: RefreshCw, keywords: 'refresh sync', run: () => { void reload(); setOpen(false) } },
-      { id: 'a-folder', label: 'Open save folder', hint: 'Action', icon: FolderOpen, keywords: 'explorer reveal', run: () => { void window.palboard.revealSaveFolder(); setOpen(false) } },
-      { id: 'a-export', label: 'Export pals as CSV', hint: 'Action', icon: Download, keywords: 'save file spreadsheet', run: () => { void window.palboard.exportData('pals-csv'); setOpen(false) } },
+      { id: 'a-folder', label: 'Open save folder', hint: 'Action', icon: FolderOpen, keywords: 'explorer reveal', run: () => { void revealSaveFolder(); setOpen(false) } },
+      { id: 'a-export', label: 'Export pals as CSV', hint: 'Action', icon: Download, keywords: 'save file spreadsheet', run: () => { void exportData('pals-csv'); setOpen(false) } },
     ]
 
     if (snapshot) {
@@ -124,7 +129,7 @@ export function CommandPalette() {
       }
     }
     return list
-  }, [snapshot, navigate, setOpen, reload, openPal])
+  }, [snapshot, navigate, setOpen, reload, openPal, exportData, revealSaveFolder])
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -148,7 +153,7 @@ export function CommandPalette() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal>
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Search PalBoard">
       <div className="animate-fade-in absolute inset-0 bg-black/55" onClick={() => setOpen(false)} />
       <div className="animate-rise absolute left-1/2 top-24 w-[560px] max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border border-line bg-surface card-shadow">
         <div className="flex items-center gap-2.5 border-b border-line-soft px-4">
