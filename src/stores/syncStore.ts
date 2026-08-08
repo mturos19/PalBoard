@@ -29,6 +29,8 @@ interface SyncStore extends SyncState {
   openDirectory(): Promise<void>
   /** Drops the world and clears anything stored in this browser. */
   forget(): Promise<void>
+  /** Re-grants folder access so live sync can resume. Needs a user gesture. */
+  reconnect(): Promise<void>
   /** Downloads an export; resolves to the file name, or null if unavailable. */
   exportData(kind: ExportKind): Promise<string | null>
 }
@@ -42,6 +44,7 @@ const initial: SyncState = {
   error: null,
   syncing: false,
   lastSyncedAt: null,
+  restoring: true,
 }
 
 export const useSyncStore = create<SyncStore>((set) => {
@@ -67,6 +70,7 @@ export const useSyncStore = create<SyncStore>((set) => {
     openFiles: (files) => apply('reading that folder', () => window.palboard.openFiles(files)),
     openDirectory: () => apply('opening that folder', () => window.palboard.openDirectory()),
     forget: () => apply('clearing the world', () => window.palboard.forget()),
+    reconnect: () => apply('reconnecting the folder', () => window.palboard.reconnect()),
     rescanWorlds: () =>
       apply('scanning for saves', async () => {
         await window.palboard.discoverWorlds()

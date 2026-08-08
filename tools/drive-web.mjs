@@ -156,6 +156,44 @@ const overflow = await page.evaluate(
 if (overflow > 2) problems.push(`page scrolls horizontally on a 390px viewport (+${overflow}px)`)
 console.log(`  captured mobile (horizontal overflow ${overflow}px)`)
 
+// Back to desktop width for the persistence checks below.
+await page.setViewportSize({ width: 1440, height: 940 })
+
+/*
+ * Persistence: a reload must land straight back on the dashboard, from the copy
+ * in IndexedDB, without the folder being picked again. This is the whole point
+ * of the storage layer and nothing short of a real reload proves it.
+ */
+await page.goto(`http://localhost:${PORT}/#/`)
+await page.waitForTimeout(600)
+const goldBefore = await page.locator('text=GOLD').locator('..').innerText()
+
+await page.reload({ waitUntil: 'networkidle' })
+try {
+  await page.waitForSelector('text=Day', { timeout: 60_000 })
+} catch {
+  problems.push('reload did not restore the save — landed back on the landing page')
+}
+const goldAfter = await page.locator('text=GOLD').locator('..').innerText().catch(() => '')
+if (goldBefore !== goldAfter) {
+  problems.push(`restored world differs: "${goldBefore.replace(/\n/g, ' ')}" -> "${goldAfter.replace(/\n/g, ' ')}"`)
+}
+await page.screenshot({ path: join(SHOTS, 'web-10-after-reload.png') })
+console.log(`  reload restored the save (${goldAfter.replace(/\n/g, ' ')})`)
+
+// ...and "forget" must actually erase it, not just close the tab's copy.
+await page.goto(`http://localhost:${PORT}/#/settings`)
+await page.waitForTimeout(600)
+await page.locator('button:has-text("Forget this save")').click()
+await page.waitForTimeout(800)
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(1500)
+const backToLanding = await page.locator('text=Drop your Palworld save folder here').count()
+if (backToLanding === 0) problems.push('forget did not erase the stored save — it came back after reload')
+else console.log('  forget erased the stored save')
+await page.screenshot({ path: join(SHOTS, 'web-11-after-forget.png') })
+
+
 await browser.close()
 stop()
 

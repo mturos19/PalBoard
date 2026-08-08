@@ -9,7 +9,7 @@ no account, no install, and no write path anywhere near your world.
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white">
   <img alt="Tailwind" src="https://img.shields.io/badge/Tailwind-v4-06B6D4?logo=tailwindcss&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-119%20passing-3fb950">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-135%20passing-3fb950">
   <img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-blue">
 </p>
 
@@ -32,15 +32,34 @@ Everything the app needs is in the page:
   no backend to send it to; the page's own Content-Security-Policy has no remote origin in
   it, so an accidental upload would fail before it left the browser.
 
-The only thing kept between visits is the "over time" chart series — a handful of counts per
-save write, in `localStorage`, wiped by one button in Settings.
+## Coming back
+
+Opening a save is a one-time act. PalBoard keeps it in IndexedDB — on your machine, under
+this site's origin — so a later visit goes straight to the dashboard with nothing to pick
+again. Two things are stored, doing different jobs:
+
+| | What it is | Why |
+|---|---|---|
+| **The save bytes** | a copy of `Level.sav` and friends, ~2–3 MB | reopens instantly, in every browser, with no prompt |
+| **The folder handle** | a reference, no data | lets PalBoard re-read the folder and follow autosaves |
+
+Browsers drop a folder's read permission on restart and will only re-grant it inside a
+click. Rather than greet a returning visitor with a permission prompt, PalBoard renders the
+stored copy immediately and offers a **Reconnect** button in Settings to resume live updates.
+
+**Forget this save** in Settings erases all of it — bytes, chart history and folder
+permission — and is verified to actually do so by the browser driver.
 
 ## Live sync
 
 | Browser | How you open a save | Follows autosaves |
 |---|---|---|
-| Chrome, Edge, Opera | File System Access API (or drag-drop) | **Yes** — polls the folder and re-parses on change |
+| Chrome, Edge, Opera | "Choose save folder" (File System Access API) | **Yes** — polls the folder every 5s, re-parses on change |
+| Chrome, Edge, Opera | Drag-drop or "Browse instead" | No — press Reload, or reopen as a folder |
 | Firefox, Safari | Drag-drop or folder picker | No — the picked files are a snapshot; press Reload |
+
+Polling checks only `Level.sav`'s mtime, so a quiet world costs one stat call every few
+seconds rather than a 32 MB reparse.
 
 ---
 
@@ -159,7 +178,12 @@ core/                platform-neutral parser — no Node built-ins, runs in both
   exporter.ts        CSV / JSON exports
 shared/              domain model, platform contract, extracted game data
 src/
-  platform/          the browser adapter: world sources, parse worker, history, web API
+  platform/          the browser adapter
+    worldSource.ts   dropped files / directory handle -> WorldSource
+    parse.worker.ts  decompress + parse off the main thread
+    storage.ts       the remembered save, in IndexedDB
+    history.ts       the over-time series, in localStorage
+    webApi.ts        window.palboard for the browser
   pages/             Landing, Dashboard, Pals, Bases, Inventory, Map, Statistics, Settings
   components/ stores/
 electron/            desktop shell — see "Desktop" below
@@ -187,7 +211,7 @@ npm install
 npm run dev        # hot-reloading dev server
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve the built site
-npm test           # 119 tests
+npm test           # 135 tests
 ```
 
 To see the whole browser path working against a real save — WASM, worker, upload, every
@@ -198,8 +222,9 @@ npm run build
 npm run drive -- "%LOCALAPPDATA%\Pal\Saved\SaveGames\<steam-id>\<world>"
 ```
 
-It screenshots every page into `shots/` and fails on any console error, on a tooltip that
-renders unreadably, or on horizontal overflow at phone width.
+It screenshots every page into `shots/` and fails on any console error, a tooltip that
+renders unreadably, horizontal overflow at phone width, a reload that does not restore the
+remembered save, or a "Forget" that leaves data behind.
 
 ## Deploying
 

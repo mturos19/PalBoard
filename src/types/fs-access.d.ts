@@ -6,9 +6,17 @@
  * drag the rest of the app along with it.
  */
 
+interface FileSystemHandlePermissionDescriptor {
+  mode?: 'read' | 'readwrite'
+}
+
 interface FileSystemDirectoryHandle {
   /** Async-iterates the folder's children. Present in Chromium, not in the lib. */
   values(): AsyncIterableIterator<FileSystemDirectoryHandle | FileSystemFileHandle>
+  /** Whether a stored handle can still be read without asking again. */
+  queryPermission?(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>
+  /** Re-asks for access. Only succeeds inside a user gesture. */
+  requestPermission?(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>
 }
 
 interface Window {

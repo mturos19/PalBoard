@@ -27,6 +27,7 @@ export function SettingsPage() {
   const browseForWorld = useSyncStore((s) => s.browseForWorld)
   const reload = useSyncStore((s) => s.reload)
   const forget = useSyncStore((s) => s.forget)
+  const reconnect = useSyncStore((s) => s.reconnect)
   const accent = useUiStore((s) => s.accent)
   const setAccent = useUiStore((s) => s.setAccent)
   const notificationsEnabled = useUiStore((s) => s.notificationsEnabled)
@@ -36,6 +37,10 @@ export function SettingsPage() {
   // Only a world opened as a folder can be followed — uploaded files are a
   // snapshot of the moment they were picked.
   const canFollow = window.palboard.canFollow()
+  // A remembered folder whose read permission lapsed: the save is already on
+  // screen from the stored copy, and one click brings live updates back.
+  const needsReconnect = window.palboard.needsReconnect()
+  const storedInfo = window.palboard.storedInfo()
   const [live, setLiveState] = useState(() => window.palboard.isLive())
   const toggleLive = (next: boolean) => {
     window.palboard.setLive(next)
@@ -44,9 +49,11 @@ export function SettingsPage() {
 
   const followHint = canFollow
     ? 'Re-reads the folder every few seconds and refreshes after each autosave.'
-    : canOpenDirectory
-      ? 'This save was uploaded, so it cannot change. Use “Open another” and choose the folder to follow it live.'
-      : 'Needs a browser that can open a folder — Chrome, Edge or Opera. Elsewhere, use Reload.'
+    : needsReconnect
+      ? 'Showing the copy stored in this browser. Reconnect the folder to pick up new autosaves.'
+      : canOpenDirectory
+        ? 'This save was uploaded, so it cannot change. Use “Open another” and choose the folder to follow it live.'
+        : 'Needs a browser that can open a folder — Chrome, Edge or Opera. Elsewhere, use Reload.'
 
   const d = snapshot?.diagnostics
 
@@ -85,7 +92,16 @@ export function SettingsPage() {
             Follow the save while I play
             <span className="block text-[11px] text-ink-faint">{followHint}</span>
           </span>
-          <Toggle checked={live} disabled={!canFollow} onChange={toggleLive} />
+          {needsReconnect ? (
+            <button
+              onClick={() => void reconnect()}
+              className="shrink-0 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-canvas transition-opacity hover:opacity-90"
+            >
+              Reconnect
+            </button>
+          ) : (
+            <Toggle checked={live} disabled={!canFollow} onChange={toggleLive} />
+          )}
         </div>
       </Card>
 
@@ -183,14 +199,21 @@ export function SettingsPage() {
               to upload it to — and it is opened for reading only, so playing on afterwards is safe.
             </p>
             <p className="mt-2 text-xs text-ink-muted">
-              The only thing kept between visits is the chart history below: a few counts per save,
-              in this browser's local storage. Closing the tab forgets everything else.
+              So it reopens instantly next time, a copy is kept in this browser's storage, on this
+              device, under this site only. Nothing about it is shared, and clearing it below
+              removes the copy, the chart history and the folder permission together.
             </p>
+            {storedInfo ? (
+              <p className="mt-2 text-[11px] text-ink-faint">
+                Currently holding <span className="text-ink-muted">{storedInfo.label}</span> ·{' '}
+                {formatBytes(storedInfo.bytes)} · saved {formatRelativeTime(storedInfo.storedAt)}
+              </p>
+            ) : null}
             <button
               onClick={() => void forget()}
               className="mt-3 flex items-center gap-1.5 rounded-lg border border-rose/30 bg-rose/10 px-2.5 py-1.5 text-xs text-rose transition-colors hover:bg-rose/15"
             >
-              <Trash2 size={12} /> Close this save and clear stored history
+              <Trash2 size={12} /> Forget this save and erase everything stored
             </button>
           </div>
         </div>

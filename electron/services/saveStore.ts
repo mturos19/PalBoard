@@ -30,6 +30,9 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
     error: null,
     syncing: false,
     lastSyncedAt: null,
+    // The desktop shell decides its world from disk during `initialise`, so it
+    // is never waiting on a remembered one.
+    restoring: false,
   }
 
   private readonly watcher = new SaveWatcher()

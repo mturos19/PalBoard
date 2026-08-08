@@ -157,8 +157,8 @@ export function LandingPage() {
           />
           <Assurance
             icon={MonitorSmartphone}
-            title="Nothing is kept"
-            detail="Close the tab and it is gone. Only your chart history stays, in this browser."
+            title="Stays in this browser"
+            detail="A copy is kept on this device so it reopens instantly next time. One button in Settings erases it."
           />
         </section>
 

@@ -17,12 +17,15 @@ import type { ExportKind, PalBoardApi, SyncState } from '@shared/ipc'
 import { buildExport } from '@core/exporter'
 import { appendHistory, clearAll, loadHistory } from './history'
 import {
+  collectWorldFiles,
   indexDirectory,
   indexPickedFiles,
   NoWorldFoundError,
   worldSourceFor,
+  type PickedDirectory,
   type WorldHandle,
 } from './worldSource'
+import { clearSession, loadSession, requestPersistence, saveSession } from './storage'
 import type { ParseRequest, ParseResponse } from './parse.worker'
 
 /** How often a live directory is checked for a newer Level.sav. */
@@ -45,6 +48,16 @@ export interface WebApi extends PalBoardApi {
   /** Whether this world is being polled for changes. */
   isLive(): boolean
   setLive(live: boolean): void
+  /**
+   * True when a remembered world came with a folder handle whose read
+   * permission has lapsed. The save is already on screen from the cached bytes;
+   * one click on {@link reconnect} restores live updates.
+   */
+  needsReconnect(): boolean
+  /** Re-asks for folder access. Must be called from a click — browsers require it. */
+  reconnect(): Promise<SyncState>
+  /** What PalBoard is keeping in this browser, for the Settings readout. */
+  storedInfo(): { label: string; bytes: number; storedAt: number } | null
   /** Forgets the world and wipes anything kept in this browser. */
   forget(): Promise<SyncState>
 }
@@ -59,6 +72,10 @@ export function createWebApi(): WebApi {
     error: null,
     syncing: false,
     lastSyncedAt: null,
+    // Assume there is something to restore until the lookup says otherwise, so
+    // a returning visitor sees the boot screen rather than a flash of the
+    // landing page followed by their dashboard.
+    restoring: true,
   }
 
   const listeners = new Set<(state: SyncState) => void>()
@@ -76,6 +93,9 @@ export function createWebApi(): WebApi {
   let live = false
   /** Last Level.sav mtime we parsed, so polling can skip unchanged saves. */
   let lastSeenModified: number | null = null
+  /** Folder handle we hold but cannot read yet — see `needsReconnect`. */
+  let pendingDirectory: PickedDirectory | null = null
+  let stored: { label: string; bytes: number; storedAt: number } | null = null
 
   // --- worker ----------------------------------------------------------------
 
@@ -147,6 +167,10 @@ export function createWebApi(): WebApi {
             lastSyncedAt: Date.now(),
           })
           appendHistory(response.snapshot)
+          // Keep the remembered copy in step with the folder, so a later visit
+          // that cannot re-open it still shows the latest save rather than the
+          // one from whenever the folder was first picked.
+          if (revision > 1 && state.worldPath) void remember(state.worldPath)
         } else {
           patch({ status: 'error', error: response.error })
         }
@@ -166,21 +190,92 @@ export function createWebApi(): WebApi {
    * swap in the empty dashboard while the save was still being read, and would
    * strand the user there if the folder turned out not to be a world at all.
    */
-  async function adopt(next: WorldHandle, label: string): Promise<SyncState> {
+  async function adopt(
+    next: WorldHandle,
+    label: string,
+    options: { remember?: boolean } = {},
+  ): Promise<SyncState> {
     handle = next
     lastSeenModified = null
     revision = 0
-    patch({ status: 'loading', error: null, snapshot: null, stats: null, worldPath: null })
+    pendingDirectory = null
+    patch({
+      status: 'loading',
+      error: null,
+      snapshot: null,
+      stats: null,
+      worldPath: null,
+      restoring: false,
+    })
 
     await reload()
 
     if (state.status === 'ready') {
       patch({ worldPath: label })
       if (next.kind === 'directory') setLive(true)
+      if (options.remember !== false) void remember(label)
     } else if (handle === next) {
       handle = null
     }
     return state
+  }
+
+  /**
+   * Writes the current world to IndexedDB so the next visit opens straight into
+   * it. Deliberately not awaited by callers: the dashboard is already on screen
+   * and a slow or failed write must not hold it up.
+   */
+  async function remember(label: string): Promise<void> {
+    const target = handle
+    if (!target) return
+    try {
+      const files = await collectWorldFiles(target)
+      // A world can be swapped or forgotten while the bytes are being read.
+      if (handle !== target) return
+      await saveSession(label, files, target.kind === 'directory' ? target : null)
+      stored = {
+        label,
+        bytes: [...files.entries.values()].reduce((n, f) => n + f.size, 0),
+        storedAt: Date.now(),
+      }
+      void requestPersistence()
+    } catch {
+      // Best effort; the session simply is not remembered.
+    }
+  }
+
+  /**
+   * Reopens the world from the last visit.
+   *
+   * The cached bytes are the fast path and always work. A stored folder handle
+   * is better — it follows autosaves — but only if its read permission survived;
+   * browsers drop that on restart and will not re-grant it outside a click, so
+   * a lapsed handle is parked for {@link reconnect} rather than prompting here.
+   */
+  async function restore(): Promise<void> {
+    try {
+      const session = await loadSession()
+      if (!session || handle) {
+        patch({ restoring: false })
+        return
+      }
+      stored = { label: session.label, bytes: session.bytes, storedAt: session.storedAt }
+
+      const granted =
+        session.directory && (await queryReadPermission(session.directory.handle)) === 'granted'
+
+      if (granted && session.directory) {
+        await adopt(session.directory, session.label, { remember: false })
+        return
+      }
+
+      await adopt(session.files, session.label, { remember: false })
+      pendingDirectory = session.directory
+    } catch {
+      patch({ restoring: false })
+    } finally {
+      patch({ restoring: false })
+    }
   }
 
   // --- live polling ----------------------------------------------------------
@@ -246,6 +341,29 @@ export function createWebApi(): WebApi {
     }
   }
 
+  /**
+   * Re-grants access to a remembered folder so live sync can resume.
+   *
+   * `requestPermission` only works inside a user gesture, which is why this is
+   * a button rather than something the restore does by itself.
+   */
+  async function reconnect(): Promise<SyncState> {
+    const directory = pendingDirectory
+    if (!directory) return state
+    try {
+      const permission = await directory.handle.requestPermission?.({ mode: 'read' })
+      if (permission !== 'granted') return state
+      return await adopt(directory, state.worldPath ?? directory.worldId)
+    } catch (err) {
+      return patch({ error: describe(err) })
+    }
+  }
+
+  // Reopen last visit's world. Kicked off here rather than awaited: creating
+  // the API must stay synchronous so `window.palboard` exists before React
+  // mounts. `state.restoring` is what the app waits on.
+  void restore()
+
   // --- the shared contract ---------------------------------------------------
 
   return {
@@ -255,6 +373,9 @@ export function createWebApi(): WebApi {
     canFollow: () => handle?.kind === 'directory',
     isLive: () => live,
     setLive,
+    needsReconnect: () => pendingDirectory !== null,
+    reconnect,
+    storedInfo: () => stored,
 
     getState: () => Promise.resolve(state),
 
@@ -286,21 +407,23 @@ export function createWebApi(): WebApi {
       return Promise.resolve(defaultName)
     },
 
-    forget: () => {
+    forget: async () => {
       setLive(false)
       handle = null
+      pendingDirectory = null
       lastSeenModified = null
+      stored = null
       clearAll()
-      return Promise.resolve(
-        patch({
-          status: 'idle',
-          worldPath: null,
-          snapshot: null,
-          stats: null,
-          error: null,
-          lastSyncedAt: null,
-        }),
-      )
+      await clearSession()
+      return patch({
+        status: 'idle',
+        worldPath: null,
+        snapshot: null,
+        stats: null,
+        error: null,
+        lastSyncedAt: null,
+        restoring: false,
+      })
     },
 
     onStateChanged: (listener) => {
@@ -359,6 +482,23 @@ function download(data: string, fileName: string, mimeType: string): void {
   // Revoking immediately can cancel the download in some browsers; one turn of
   // the event loop is enough for the click to have been dispatched.
   setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/**
+ * Whether a stored folder handle can still be read without asking.
+ *
+ * Chrome keeps the grant for the life of the tab and sometimes across a
+ * restart; when it does not, this returns 'prompt' and only a click can revive
+ * it. Treated as denied on any error so a restore never hangs on it.
+ */
+async function queryReadPermission(
+  handle: FileSystemDirectoryHandle,
+): Promise<PermissionState | 'denied'> {
+  try {
+    return (await handle.queryPermission?.({ mode: 'read' })) ?? 'denied'
+  } catch {
+    return 'denied'
+  }
 }
 
 const describe = (err: unknown): string =>

@@ -31,6 +31,12 @@ export interface SyncState {
   /** True while a reload triggered by a save write is in flight. */
   syncing: boolean
   lastSyncedAt: number | null
+  /**
+   * True while the platform is still working out which world to show — the web
+   * build looks for a remembered one before deciding. The app holds on its boot
+   * screen rather than flashing onboarding at a returning visitor.
+   */
+  restoring: boolean
 }
 
 export const IPC = {

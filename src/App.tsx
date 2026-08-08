@@ -17,13 +17,16 @@ import { useUiStore } from './stores/uiStore'
 export function App() {
   const hydrated = useSyncStore((s) => s.hydrated)
   const worldPath = useSyncStore((s) => s.worldPath)
+  const restoring = useSyncStore((s) => s.restoring)
 
   // Subscribe to platform state for the lifetime of the app.
   useEffect(() => connectSync(), [])
   useGlobalShortcuts()
   useAlertNotifications()
 
-  if (!hydrated) return <BootScreen />
+  // Hold the boot screen while a remembered world is being looked up, so a
+  // returning visitor never sees onboarding flash before their own dashboard.
+  if (!hydrated || restoring) return <BootScreen />
 
   // No world open yet: the landing page takes over the whole window. It also
   // owns the loading state, so a first-time visitor watches their save being
@@ -105,11 +108,14 @@ function useAlertNotifications() {
 }
 
 function BootScreen() {
+  const restoring = useSyncStore((s) => s.restoring)
   return (
     <div className="flex h-full items-center justify-center bg-canvas">
       <div className="flex flex-col items-center gap-3">
         <div className="size-3 animate-pulse-dot rounded-full bg-accent" />
-        <p className="text-sm text-ink-faint">Starting PalBoard…</p>
+        <p className="text-sm text-ink-faint">
+          {restoring ? 'Reopening your save…' : 'Starting PalBoard…'}
+        </p>
       </div>
     </div>
   )

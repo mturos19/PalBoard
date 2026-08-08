@@ -126,6 +126,42 @@ export function worldSourceFor(handle: WorldHandle): WorldSource {
   return handle.kind === 'files' ? filesSource(handle) : directorySource(handle)
 }
 
+/** The files `core/loader` actually reads. Everything else in the folder is noise. */
+const WORLD_FILES = ['Level.sav', 'LevelMeta.sav', 'WorldOption.sav'] as const
+
+/**
+ * Materialises a world into plain in-memory files.
+ *
+ * A folder-backed world is a live reference, not data, so there is nothing to
+ * remember it by. This reads the handful of saves the loader consumes — under
+ * 3 MB even on a large world, against the ~170 MB the folder holds once the
+ * game's backups are counted — so the same world can be reopened later without
+ * asking for the folder again.
+ */
+export async function collectWorldFiles(handle: WorldHandle): Promise<PickedFiles> {
+  if (handle.kind === 'files') return handle
+
+  const source = worldSourceFor(handle)
+  const entries = new Map<string, File>()
+
+  const take = async (path: string): Promise<void> => {
+    const bytes = await source.read(path)
+    if (!bytes) return
+    const lastModified = (await source.modifiedAt(path)) ?? Date.now()
+    const name = path.slice(path.lastIndexOf('/') + 1)
+    entries.set(path.toLowerCase(), new File([toBlobPart(bytes)], name, { lastModified }))
+  }
+
+  for (const name of WORLD_FILES) await take(name)
+  for (const name of await source.list('Players')) {
+    if (name.toLowerCase().endsWith('.sav') && !name.includes('_dps')) {
+      await take(`Players/${name}`)
+    }
+  }
+
+  return { kind: 'files', worldId: handle.worldId, entries }
+}
+
 function filesSource(picked: PickedFiles): WorldSource {
   const get = (path: string): File | undefined => picked.entries.get(path.toLowerCase())
   return {
@@ -203,6 +239,14 @@ async function childDirectory(
   }
   return null
 }
+
+/**
+ * Narrows a `Uint8Array` to the plain-`ArrayBuffer` view `Blob` accepts. The
+ * bytes are always ours and never shared memory; this only satisfies the
+ * generic the DOM lib requires.
+ */
+const toBlobPart = (bytes: Uint8Array): ArrayBuffer =>
+  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 
 // --- path helpers -------------------------------------------------------------
 // `webkitRelativePath` is the only place a dropped File records where it sat in

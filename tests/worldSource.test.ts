@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  collectWorldFiles,
   indexDirectory,
   indexPickedFiles,
   NoWorldFoundError,
@@ -171,5 +172,47 @@ describe('indexDirectory', () => {
     expect(await source.list('Players')).toEqual(['abc.sav'])
     expect(await source.read('Players/missing.sav')).toBeNull()
     expect(await source.modifiedAt('Level.sav')).toBe(42)
+  })
+})
+
+// --- remembering a world ------------------------------------------------------
+
+describe('collectWorldFiles', () => {
+  it('copies a folder-backed world into plain files so it can be remembered', async () => {
+    const picked = await collectWorldFiles(
+      await indexDirectory(
+        dirHandle('W', {
+          'Level.sav': [1, 2],
+          'LevelMeta.sav': [3],
+          'WorldOption.sav': [4],
+          Players: { 'abc.sav': [5], 'abc_dps.sav': [6] },
+          // Not read by the loader, so not worth storing.
+          'LocalData.sav': [7],
+          backup: { world: { 'Level.sav': [8] } },
+        }),
+      ),
+    )
+
+    expect([...picked.entries.keys()].sort()).toEqual([
+      'level.sav',
+      'levelmeta.sav',
+      'players/abc.sav',
+      'worldoption.sav',
+    ])
+    expect(Array.from(new Uint8Array(await picked.entries.get('level.sav')!.arrayBuffer()))).toEqual(
+      [1, 2],
+    )
+  })
+
+  it('leaves an already-uploaded world alone', async () => {
+    const picked = indexPickedFiles([file('W/Level.sav'), file('W/Players/abc.sav')])
+    expect(await collectWorldFiles(picked)).toBe(picked)
+  })
+
+  it('tolerates a world missing every optional save', async () => {
+    const picked = await collectWorldFiles(
+      await indexDirectory(dirHandle('W', { 'Level.sav': [1] })),
+    )
+    expect([...picked.entries.keys()]).toEqual(['level.sav'])
   })
 })
