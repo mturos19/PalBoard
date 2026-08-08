@@ -1,0 +1,17 @@
+# Response headers for Cloudflare (Pages and Workers static assets both read
+# this file) and Netlify. Vite copies everything in public/ to the root of
+# dist/, so this ships with the build.
+#
+# The page's own Content-Security-Policy lives in index.html; these are the
+# headers a host has to set on its side.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# Filenames are content-hashed, so a given URL's bytes never change.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

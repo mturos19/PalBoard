@@ -1,0 +1,21 @@
+// Cloudflare deploy config.
+//
+// This file exists mainly to stop Wrangler helping. With no config present,
+// `wrangler deploy` runs an interactive "let me set your project up" flow that
+// a CI build auto-answers "yes" to — it rewrites vite.config.ts to add
+// `@cloudflare/vite-plugin`, never installs it, then re-runs the build and
+// fails. A config file makes it skip all of that and just upload `dist/`.
+//
+// There is no `main` entry because there is no server code: PalBoard decodes
+// saves in the visitor's browser, so this deploys as static assets only. That
+// is also why `nodejs_compat` is absent — nothing here runs on Node.
+{
+  "name": "palboard",
+  "compatibility_date": "2026-08-08",
+  "assets": {
+    "directory": "./dist",
+    // Routing is hash-based (`/#/pals`), so this is belt-and-braces: a stray
+    // path-style URL renders the app instead of a 404.
+    "not_found_handling": "single-page-application"
+  }
+}

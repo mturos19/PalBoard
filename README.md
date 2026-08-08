@@ -228,15 +228,34 @@ remembered save, or a "Forget" that leaves data behind.
 
 ## Deploying
 
-`npm run build` produces a static `dist/`. Asset paths are relative and routing is hash-based,
-so it works from a domain root or a subpath with **no rewrite rules**:
+`npm run build` produces a static `dist/`. There is no backend, no environment variable and
+no server runtime. Asset paths are relative and routing is hash-based, so it works from a
+domain root or a subpath with **no rewrite rules**.
 
-- **Netlify** — `netlify.toml` is included (build command, security headers, asset caching).
-- **Vercel / Cloudflare Pages** — build `npm run build`, publish `dist`.
-- **GitHub Pages** — push `dist/` to `gh-pages`; the relative `base` makes `/<repo>/` work.
-- **Any web server** — copy `dist/` in.
+| Host | Build command | Output | Notes |
+|---|---|---|---|
+| **Cloudflare Pages** | `npm run build` | `dist` | Simplest. Leave the deploy command empty. |
+| **Cloudflare Workers** | `npm run build` | `dist` | `wrangler.jsonc` is included — see below. |
+| **Netlify** | `npm run build` | `dist` | `netlify.toml` is included. |
+| **Vercel** | `npm run build` | `dist` | Framework preset: Vite. |
+| **GitHub Pages** | `npm run build` | `dist` | Relative `base` makes `/<repo>/` work. |
+| **Any web server** | — | — | Copy `dist/` in. |
 
-There is no backend and no environment variable to set.
+`public/_headers` travels with the build and sets the security and caching headers on
+Cloudflare and Netlify alike.
+
+### A note on Cloudflare Workers
+
+Cloudflare now steers new projects towards **Workers** rather than Pages, which means the
+deploy step runs `npx wrangler deploy`. With no Wrangler config in the repo, that command
+starts an interactive setup that CI auto-answers "yes" to: it rewrites `vite.config.ts` to
+add `@cloudflare/vite-plugin`, does not install it, re-runs the build, and fails on its own
+edit.
+
+`wrangler.jsonc` exists to prevent that. It declares an assets-only deployment — no `main`,
+because there is no server code to run — so Wrangler skips setup and just uploads `dist/`.
+
+**Cloudflare Pages remains the better fit**: same result, and no deploy command at all.
 
 ## Desktop
 
