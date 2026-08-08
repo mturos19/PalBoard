@@ -1,40 +1,46 @@
 # PalBoard
 
-**A real-time, read-only desktop dashboard for Palworld.** It finds your save, decodes a
-proprietary binary format the game never documented, and keeps a live view of your world
-on screen while you play.
+**A Palworld save dashboard that runs entirely in your browser.** Drop your save folder on
+the page and it decodes a proprietary binary format the game never documented — no upload,
+no account, no install, and no write path anywhere near your world.
 
 <p>
-  <img alt="Electron" src="https://img.shields.io/badge/Electron-37-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white">
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white">
   <img alt="Tailwind" src="https://img.shields.io/badge/Tailwind-v4-06B6D4?logo=tailwindcss&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-111%20passing-3fb950">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-119%20passing-3fb950">
   <img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-blue">
 </p>
 
 ![PalBoard dashboard](assets/main_screen.png)
 
-The save file is a 31 MB Unreal Engine `GVAS` tree wrapped in an undocumented container and
-compressed with Oodle, a proprietary codec. PalBoard opens it in **~320 ms**, end to end —
-1,008 pals, 4 bases, 988 structures and 12,696 storage slots — then re-reads it within a
-couple of seconds of every autosave. It never writes to your saves.
+`Level.sav` is a 32 MB Unreal Engine `GVAS` tree wrapped in an undocumented container and
+compressed with Oodle, a proprietary codec. PalBoard opens it in **about half a second** in a
+browser tab — 1,008 pals, 4 bases, 988 structures — and can keep following it as you play.
 
-## Engineering highlights
+## Why it works without a server
 
-- **Reverse-engineered binary format.** Three container variants (`PlZ`, `PlM`, `CNK`), a
-  generic UE 5.1 `GVAS` property reader, and Palworld-specific `RawData` decoders — written
-  from scratch against real saves.
-- **~320 ms cold parse of a 31 MB tree** via selective subtree skipping and a read-only
-  decode path that drops UE's round-tripping metadata.
-- **Built to survive game patches.** Every container property parses inside a boundary that
-  restores the cursor on under-read, over-read, or throw, so a format change costs one
-  subtree instead of the whole save — and surfaces as a visible warning, not silent drift.
-- **Authoritative game data**, extracted from Palworld's own localisation tables rather than
-  guessed: 322 pals, 1,993 items, 1,141 skills.
-- **Strict process isolation.** Context-isolated preload, a typed IPC contract shared by both
-  processes, and no write path anywhere in the codebase.
-- **111 tests** across the parser, compression, watcher, and domain logic.
+Everything the app needs is in the page:
+
+- **Oodle** decodes through [`ooz-wasm`](https://github.com/SnosMe/ooz-wasm), a WebAssembly
+  build of the open-source `ooz` reimplementation. Decode-only, which is all a read-only
+  dashboard needs.
+- **zlib** is `fflate`, so the parser has no Node dependency.
+- **The 32 MB parse runs in a Web Worker**, so the page never freezes on an autosave.
+- The save is read from a `File` or a directory handle and **never sent anywhere**. There is
+  no backend to send it to; the page's own Content-Security-Policy has no remote origin in
+  it, so an accidental upload would fail before it left the browser.
+
+The only thing kept between visits is the "over time" chart series — a handful of counts per
+save write, in `localStorage`, wiped by one button in Settings.
+
+## Live sync
+
+| Browser | How you open a save | Follows autosaves |
+|---|---|---|
+| Chrome, Edge, Opera | File System Access API (or drag-drop) | **Yes** — polls the folder and re-parses on change |
+| Firefox, Safari | Drag-drop or folder picker | No — the picked files are a snapshot; press Reload |
 
 ---
 
@@ -42,11 +48,11 @@ couple of seconds of every autosave. It never writes to your saves.
 
 ### Dashboard
 
-The landing view ([`main_screen.png`](assets/main_screen.png), above) resolves the whole world
-into one screen: a live resource strip, workers, alphas, structures, towers and fast travels;
-alerts for starving pals and near-full storage; a per-player breakdown with Paldeck progress;
-and base cards with their in-game compass coordinates. The status bar along the bottom reports
-the parse itself — container codec, compression ratio, timing, slots read, and any warnings.
+The landing view resolves the whole world into one screen: a live resource strip, workers,
+alphas, structures, towers and fast travels; alerts for starving pals and near-full storage;
+a per-player breakdown with Paldeck progress; and base cards with in-game compass coordinates.
+The status bar reports the parse itself — container codec, compression ratio, timing, slots
+read, and any warnings.
 
 ### Pals
 
@@ -54,14 +60,11 @@ the parse itself — container codec, compression ratio, timing, slots read, and
 |---|---|
 | [![Pals table](assets/pal_screen.png)](assets/pal_screen.png) | [![Pal detail drawer](assets/pal_screen_2.png)](assets/pal_screen_2.png) |
 
-All 1,008 owned pals in a virtualized table that stays smooth at any world size — nicknames,
-real species names and elements, level, IVs, food, sanity, whereabouts and passive skills, with
-full-text search, quick filters (alpha, lucky, condensed, hungry, depressed…), sorting, and CSV
-export.
-
-Selecting a row opens a detail drawer: live condition, individual values as bars, condense rank
-and soul enhancements, passive and active skills, and exactly where the pal lives — container,
-slot index, owner, and instance id.
+Every owned pal in a virtualized table that stays smooth at any world size — nicknames, real
+species names and elements, level, IVs, food, sanity, whereabouts and passive skills, with
+full-text search, quick filters (alpha, lucky, condensed, hungry, depressed…), sorting, and
+CSV export. Selecting a row opens a drawer with live condition, IV bars, condense rank and
+soul enhancements, skills, and exactly where the pal lives.
 
 ### Bases and inventory
 
@@ -69,25 +72,21 @@ slot index, owner, and instance id.
 |---|---|
 | [![Bases](assets/bases_screen.png)](assets/bases_screen.png) | [![Inventory](assets/inventory_screen.png)](assets/inventory_screen.png) |
 
-**Bases** lists each camp with its worker count, structure count, real influence radius in world
-units, an attention counter for hungry, sad or sick workers, and the full assigned roster.
+**Bases** lists each camp with its worker count, structure count, real influence radius,
+an attention counter for hungry, sad or sick workers, and the full assigned roster.
 
-**Inventory** decodes and aggregates every storage container in the world — 12,696 of 13,372
-slots here, 545 distinct items, 5.4 M units — split by world storage and each player's pouch,
-then searched, category-filtered, sorted and exported to CSV.
+**Inventory** aggregates the storage you actually own — chests standing in your bases, plus
+each player's pouches — searched, category-filtered, sorted and exported to CSV.
 
 ### Statistics
 
 [![Statistics](assets/statistics_screen.png)](assets/statistics_screen.png)
 
-Level distribution, element mix, top species with alpha counts, and IV quality across the
-collection. **Pals over time** is recorded by PalBoard itself — the save keeps no history, so
-the app maintains its own time series across sessions.
+Level distribution, element mix, top species with alpha counts, and IV quality. **Pals over
+time** is recorded by PalBoard itself, since the save keeps no history.
 
-Not pictured: an interactive **Map** in the game's own compass coordinates showing bases with
-their influence radius and last player positions, a `Ctrl+K` command palette that fuzzy-searches
-pals, items, bases and actions, and a settings page exposing world switching, themes and parser
-diagnostics.
+Also: an interactive **Map** in the game's compass coordinates, and a `Ctrl+K` command palette
+that fuzzy-searches pals, items, bases and actions.
 
 ---
 
@@ -95,8 +94,8 @@ diagnostics.
 
 ### The save format
 
-Palworld saves are GVAS (Unreal Engine 5.1 `SaveGame`) payloads inside a small custom container.
-Three variants exist in the wild; PalBoard reads all three.
+Palworld saves are GVAS (Unreal Engine 5.1 `SaveGame`) payloads inside a small custom
+container. Three variants exist in the wild; PalBoard reads all three.
 
 | Magic | Codec | Seen in |
 |-------|-------|---------|
@@ -104,109 +103,140 @@ Three variants exist in the wild; PalBoard reads all three.
 | `PlM` | Oodle (Kraken/Mermaid family) | Palworld ≥ 0.6, including 1.0 |
 | `CNK` | Xbox/Game Pass envelope around one of the above | Game Pass |
 
-Oodle is proprietary, so decoding uses [`ooz-wasm`](https://github.com/SnosMe/ooz-wasm) — a
-WebAssembly build of the open-source `ooz` reimplementation. It is decode-only, which is all a
-read-only dashboard needs.
-
 ### Two things make it fast
 
-**Selective parsing.** `Level.sav` decompresses to ~31 MB, but a large share of that is world
-foliage and dungeon spawner state a dashboard never shows. Every GVAS property declares its own
-byte length, so the parser seeks straight past those subtrees (`LEVEL_SKIP_PATHS`) instead of
-allocating millions of objects.
+**Selective parsing.** `Level.sav` decompresses to ~32 MB, but a large share of that is world
+foliage and dungeon spawner state a dashboard never shows. Every GVAS property declares its
+own byte length, so the parser seeks straight past those subtrees (`LEVEL_SKIP_PATHS`) instead
+of allocating millions of objects.
 
 **Read-only decoding.** Because PalBoard never writes saves, the parser discards UE's
-round-tripping metadata — property GUIDs, struct ids, declared type names — and decodes directly
-to plain JS values. An `IntProperty` becomes a `number`, not a wrapper object.
+round-tripping metadata — property GUIDs, struct ids, declared type names — and decodes
+directly to plain JS values. An `IntProperty` becomes a `number`, not a wrapper object.
+
+### Whose chest is it?
+
+`ItemContainerSaveData` holds *every* container on the island. In a real 1.0 world about
+4,900 of ~5,000 are unopened treasure chests, enemy camp loot and drop tables for wild pals,
+each carrying a few hundred gold. Summing them reports the whole map's contents as the
+player's — 6.7M gold against the 1.7M actually held, and 12,696 "storage slots" against a
+real 429.
+
+Ownership is resolved structurally instead. Each placed object records the base camp it
+stands in, and a storage object carries an `ItemContainer` module naming the container it
+owns; one pass over `MapObjectSaveData` yields both. Storage is what a base you founded can
+reach, plus each player's own pouches. Everything else is scenery.
 
 ### Resilience to game updates
 
-Palworld reshapes its save between patches. The parser is built so that costs one subtree, not
-the whole save:
+Palworld reshapes its save between patches. The parser is built so that costs one subtree,
+not the whole save:
 
 - Container properties parse inside a boundary that restores the cursor to the property's
   declared end — whether the inner parse under-read, over-read, or threw.
 - Unknown property types are skipped by declared size rather than desynchronising the stream.
 - Unrecognised struct types fall back to a nested property walk.
-- Every recovery is reported as a warning and surfaced in the UI, so drift is **visible** rather
-  than silent.
+- Every recovery is reported as a warning and surfaced in the UI, so drift is **visible**
+  rather than silent. That includes the chest-ownership link above: if it ever stops
+  resolving, Inventory says so instead of quietly showing an empty world.
 
 ### Names and static data
 
-The save stores developer ids (`AmaterasuWolf_Dark`, `Pal_crystal_S`) and no static per-species
-data. Rather than ship a hand-maintained community table, PalBoard extracts display names
-straight from the game's own localisation assets (`tools/extract-gamedata.ts`) — 322 pals, 1,993
-items, 1,141 skills. Anything unmapped renders as a humanised id rather than a guess.
+The save stores developer ids (`AmaterasuWolf_Dark`, `Pal_crystal_S`) and no static
+per-species data. Rather than ship a hand-maintained community table, PalBoard extracts
+display names straight from the game's own localisation assets
+(`tools/extract-gamedata.ts`) — 322 pals, 1,993 items, 1,141 skills. Anything unmapped
+renders as a humanised id rather than a guess.
 
 ## Architecture
 
 ```
-electron/            main process — never exposed to the renderer
-  parser/
-    compression.ts   PlZ / PlM / CNK container handling
-    gvas/            generic Unreal GVAS reader + property parser
-    palworld/        type hints, RawData decoders, domain mapping, alerts
-    loader.ts        world folder -> SaveSnapshot
-  locator/           save auto-discovery and folder validation
-  watcher/           debounced, write-aware file watching
-  services/          SaveStore (source of truth), history, prefs, export
-  api/               IPC handlers
-shared/              domain model, typed IPC contract, extracted game data
-src/                 renderer (React) — pages, components, stores
-tests/               parser, compression, watcher and business-logic tests
-tools/               dev utilities: survey, probes, verify, data extraction
+core/                platform-neutral parser — no Node built-ins, runs in both shells
+  compression.ts     PlZ / PlM / CNK containers (fflate + ooz-wasm)
+  gvas/              generic Unreal GVAS reader + property parser
+  palworld/          type hints, RawData decoders, domain mapping, alerts
+  loader.ts          WorldSource -> SaveSnapshot
+  exporter.ts        CSV / JSON exports
+shared/              domain model, platform contract, extracted game data
+src/
+  platform/          the browser adapter: world sources, parse worker, history, web API
+  pages/             Landing, Dashboard, Pals, Bases, Inventory, Map, Statistics, Settings
+  components/ stores/
+electron/            desktop shell — see "Desktop" below
+tests/               parser, compression, inventory, watcher and business-logic tests
+tools/               dev utilities: survey, probes, verify, data extraction, browser driver
 ```
 
-**Separation of concerns.** The GVAS parser knows nothing about Palworld — it leaves
-game-specific `RawData` blobs as `Buffer`s. `parser/palworld/` decodes those and maps them onto
-`shared/domain`. The renderer only ever sees domain types, so a save-format change is absorbed
-in a single layer.
+**One parser, two shells.** `core/loader.ts` takes a `WorldSource` — read a path, list a
+directory, stat a file — and nothing under it knows what a filesystem is. The web build
+satisfies that interface over dropped `File`s or a `FileSystemDirectoryHandle`; the desktop
+build satisfies it over `node:fs`.
 
-**Single source of truth.** The main process owns state. The renderer mirrors it and issues
-commands; it never derives save data independently.
+**One API surface.** Every page talks to `window.palboard` and nothing else. On the web that
+is `createWebApi()`, installed before React mounts; the pages themselves were not rewritten
+for the port.
 
-**Live sync.** A debounced, write-aware watcher coalesces the burst of writes one autosave
-produces into a single reparse, ignores the game's own backup folder, and pushes a new snapshot
-to the renderer.
-
-## Tech stack
-
-**Main process** — Electron 37, `chokidar`, `ooz-wasm`, Node `zlib`
-**Renderer** — React 19, TypeScript 5.8, Tailwind v4, Zustand, TanStack Table/Virtual/Query,
-Recharts, React Router
-**Build & test** — Vite 7, electron-vite, Vitest, Playwright, electron-builder (NSIS)
+**Buffer.** The GVAS reader is written against Buffer's typed accessors, and the browser gets
+them from the `buffer` polyfill — a `Uint8Array` subclass. That is a deliberate trade: ~20 kB
+gzipped instead of rewriting 2,000 lines of verified binary parsing.
 
 ## Getting started
 
 ```bash
 npm install
-npm run dev        # hot-reloading dev app
-npm run build      # typecheck + production build
-npm start          # run the built app
-npm test           # 111 tests across parser and business logic
-npm run dist       # packaged Windows installer
+npm run dev        # hot-reloading dev server
+npm run build      # typecheck + production build into dist/
+npm run preview    # serve the built site
+npm test           # 119 tests
 ```
 
-PalBoard auto-detects Palworld worlds in both Windows and Proton/Wine layouts, remembers the
-last one, and otherwise lets you point it at a folder.
+To see the whole browser path working against a real save — WASM, worker, upload, every
+screen — point the driver at a world folder:
+
+```bash
+npm run build
+npm run drive -- "%LOCALAPPDATA%\Pal\Saved\SaveGames\<steam-id>\<world>"
+```
+
+It screenshots every page into `shots/` and fails on any console error, on a tooltip that
+renders unreadably, or on horizontal overflow at phone width.
+
+## Deploying
+
+`npm run build` produces a static `dist/`. Asset paths are relative and routing is hash-based,
+so it works from a domain root or a subpath with **no rewrite rules**:
+
+- **Netlify** — `netlify.toml` is included (build command, security headers, asset caching).
+- **Vercel / Cloudflare Pages** — build `npm run build`, publish `dist`.
+- **GitHub Pages** — push `dist/` to `gh-pages`; the relative `base` makes `/<repo>/` work.
+- **Any web server** — copy `dist/` in.
+
+There is no backend and no environment variable to set.
+
+## Desktop
+
+`electron/` holds the original desktop shell: save auto-discovery, a debounced write-aware
+file watcher, and history on disk. It shares `core/` and still typechecks, but the renderer
+now targets the web adapter's API, so **the desktop build needs its preload bridge widened to
+the same surface before it will run again** (`openFiles`, `openDirectory`, `isLive`, `setLive`,
+`forget`, `canOpenDirectory`). The web app is the maintained target.
 
 ### Development tools
 
 ```bash
-npx vite-node tools/verify.ts             # load a save, print the domain model
+npx vite-node tools/verify.ts <worldDir>  # load a save, print the domain model
 npx vite-node tools/survey.ts <worldDir>  # size every subtree of Level.sav
 npx vite-node tools/probe-fields.ts <dir> # union every field across all characters
-node tools/drive.mjs                      # launch the built app and screenshot it
 ```
 
 ## Safety
 
-PalBoard opens save files for reading only. There is no write path in the codebase — the Oodle
-binding is decode-only and the preload bridge exposes no mutation API. It is safe to leave
-running while you play.
+PalBoard opens save files for reading only. There is no write path in the codebase — the
+Oodle binding is decode-only and no adapter exposes a mutation API. It is safe to leave open
+while you play.
 
 ## Licence
 
 GPL-3.0-or-later, inherited from `ooz-wasm`.
 
-See [ROADMAP.md](ROADMAP.md) for what's planned and [TASKS.md](TASKS.md) for current work.
+Not affiliated with Pocketpair. Palworld and its assets belong to their owners.

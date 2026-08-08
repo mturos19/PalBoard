@@ -11,8 +11,9 @@
  */
 import { EventEmitter } from 'node:events'
 import { discoverWorlds, resolveWorldFolder } from '../locator'
-import { loadWorld } from '../parser/loader'
-import { computeStats } from '../parser/palworld/model'
+import { loadWorld } from '@core/loader'
+import { fsWorldSource } from '../worldSource'
+import { computeStats } from '@core/palworld/model'
 import { SaveWatcher } from '../watcher'
 import { HistoryStore } from './history'
 import { loadPrefs, savePrefs } from './prefs'
@@ -157,7 +158,7 @@ export class SaveStore extends EventEmitter<{ change: [SyncState] }> {
         if (!worldPath) break
 
         try {
-          const snapshot = await loadWorld(worldPath)
+          const snapshot = await loadWorld(fsWorldSource(worldPath))
 
           // The world changed while we parsed: this snapshot describes a save
           // the user is no longer looking at, so drop it and parse the new one.

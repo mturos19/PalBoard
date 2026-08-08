@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { decodeItemSlot } from '../electron/parser/palworld/inventory'
-import { buildAlerts } from '../electron/parser/palworld/alerts'
+import { decodeItemSlot } from '../core/palworld/inventory'
+import { buildAlerts } from '../core/palworld/alerts'
 import { categorise, itemName } from '../shared/gamedata/items'
 import { isHumanCharacter, speciesInfo } from '../shared/gamedata/species'
 import type { Pal, StorageSummary } from '../shared/domain'

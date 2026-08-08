@@ -6,8 +6,8 @@
  * Ids are stable across reloads; the renderer diffs them to decide what is
  * new enough to raise an OS notification for.
  */
-import { SANITY_CONCERN } from '../../../shared/domain'
-import type { Alert, BaseCamp, Pal, StorageSummary } from '../../../shared/domain'
+import { SANITY_CONCERN } from '@shared/domain'
+import type { Alert, BaseCamp, Pal, StorageSummary } from '@shared/domain'
 
 const PALBOX_WARN_RATIO = 0.9
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildItemsCsv, buildPalsCsv, buildPalsJson } from '../electron/services/exporter'
+import { buildItemsCsv, buildPalsCsv, buildPalsJson } from '../core/exporter'
 import type { Pal, SaveSnapshot } from '../shared/domain'
 
 function makePal(overrides: Partial<Pal> = {}): Pal {
@@ -52,7 +52,6 @@ function makeSnapshot(pals: Pal[], items: Array<{ id: string; count: number }> =
   return {
     revision: 1,
     loadedAt: 0,
-    savePath: '',
     world: {
       worldId: 'w',
       name: 'Test',

@@ -54,13 +54,31 @@
     height: 100%;
   }
 
+  html {
+    /*
+     * PalBoard has one palette and it is dark. Declaring it means the browser
+     * renders its own furniture to match — scrollbars, form controls, the
+     * flash of background before CSS loads — instead of drawing light-mode
+     * widgets on a near-black page.
+     */
+    color-scheme: dark;
+  }
+
   body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-feature-settings: 'cv05', 'cv11';
     -webkit-font-smoothing: antialiased;
+    /* The app shell manages its own scrolling; the page itself never scrolls. */
     overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* Charts draw their own focus ring; the default one boxes the whole SVG. */
+  .recharts-wrapper:focus-visible,
+  .recharts-surface:focus-visible {
+    outline: none;
   }
 
   ::-webkit-scrollbar {
@@ -97,13 +115,6 @@
 }
 
 @layer utilities {
-  .app-drag {
-    -webkit-app-region: drag;
-  }
-  .app-no-drag {
-    -webkit-app-region: no-drag;
-  }
-
   /* Accent gradient used by primary buttons, the logo, and hero accents. */
   .bg-accent-gradient {
     background-image: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));

@@ -6,6 +6,8 @@ export default defineConfig({
     alias: {
       '@shared': resolve('shared'),
       '@main': resolve('electron'),
+      '@core': resolve('core'),
+      '@': resolve('src'),
     },
   },
   test: {

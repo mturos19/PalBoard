@@ -4,11 +4,11 @@
  * Run with `npx vite-node tools/probe-fields.ts <world save dir>`.
  */
 import { readFileSync } from 'node:fs'
-import { decompressSave } from '../electron/parser/compression'
-import { FArchiveReader } from '../electron/parser/gvas/reader'
-import { parseGvas, parseProperties } from '../electron/parser/gvas/parser'
-import { levelParsePlan } from '../electron/parser/palworld/hints'
-import type { MapEntry, PropStruct } from '../electron/parser/gvas/types'
+import { decompressSave } from '../core/compression'
+import { FArchiveReader } from '../core/gvas/reader'
+import { parseGvas, parseProperties } from '../core/gvas/parser'
+import { levelParsePlan } from '../core/palworld/hints'
+import type { MapEntry, PropStruct } from '../core/gvas/types'
 
 const dir = process.argv[2]
 const { gvas } = await decompressSave(readFileSync(`${dir}/Level.sav`))

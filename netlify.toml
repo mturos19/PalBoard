@@ -1,0 +1,27 @@
+# Netlify deploy. The output is a plain static site — no functions, no runtime —
+# so most other hosts (Vercel, Cloudflare Pages, GitHub Pages, any web server)
+# work with the same `dist/` and need no rewrite rules: routing is hash-based.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The page reads local save files, so it is worth being explicit that it is not
+# allowed to be framed, tracked across sites, or handed device permissions.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+
+# Content-addressed filenames; safe to cache forever.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

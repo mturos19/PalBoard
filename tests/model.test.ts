@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { computeStats, humaniseSpecies, worldToMap } from '../electron/parser/palworld/model'
-import { uidFromFileName } from '../electron/parser/loader'
+import { computeStats, humaniseSpecies, worldToMap } from '../core/palworld/model'
+import { uidFromFileName } from '../core/loader'
 import type { Pal, SaveSnapshot } from '../shared/domain'
 
 function makePal(overrides: Partial<Pal> = {}): Pal {
@@ -53,7 +53,6 @@ function makeSnapshot(pals: Pal[]): SaveSnapshot {
   return {
     revision: 1,
     loadedAt: 0,
-    savePath: '',
     world: {
       worldId: 'w',
       name: 'Test',

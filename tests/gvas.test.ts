@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FArchiveReader } from '../electron/parser/gvas/reader'
-import { GvasParseError, parseGvas, parseProperties } from '../electron/parser/gvas/parser'
+import { FArchiveReader } from '../core/gvas/reader'
+import { GvasParseError, parseGvas, parseProperties } from '../core/gvas/parser'
 import { GvasBuilder, withGvasHeader } from './helpers/gvasBuilder'
 
 describe('FArchiveReader', () => {

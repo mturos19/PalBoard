@@ -2,8 +2,8 @@
  * CSV/JSON exports of the current snapshot. Pure functions produce the bytes;
  * the IPC layer owns the save dialog and file write.
  */
-import type { SaveSnapshot } from '../../shared/domain'
-import { itemName, categorise } from '../../shared/gamedata/items'
+import type { SaveSnapshot } from '@shared/domain'
+import { itemName, categorise } from '@shared/gamedata/items'
 
 /**
  * Leading characters that make a spreadsheet treat a cell as a formula.
@@ -65,13 +65,25 @@ export function buildPalsJson(snapshot: SaveSnapshot): string {
 
 export type ExportKind = 'pals-csv' | 'pals-json' | 'items-csv'
 
-export function buildExport(kind: ExportKind, snapshot: SaveSnapshot): { data: string; defaultName: string; filter: Electron.FileFilter } {
+export interface ExportResult {
+  data: string
+  defaultName: string
+  /** MIME type, for the browser's download blob. */
+  mimeType: string
+  /** File-type description and extension, for the desktop save dialog. */
+  filter: { name: string; extensions: string[] }
+}
+
+const CSV = { mimeType: 'text/csv', filter: { name: 'CSV', extensions: ['csv'] } }
+const JSON_TYPE = { mimeType: 'application/json', filter: { name: 'JSON', extensions: ['json'] } }
+
+export function buildExport(kind: ExportKind, snapshot: SaveSnapshot): ExportResult {
   switch (kind) {
     case 'pals-csv':
-      return { data: buildPalsCsv(snapshot), defaultName: 'palboard-pals.csv', filter: { name: 'CSV', extensions: ['csv'] } }
+      return { data: buildPalsCsv(snapshot), defaultName: 'palboard-pals.csv', ...CSV }
     case 'pals-json':
-      return { data: buildPalsJson(snapshot), defaultName: 'palboard-pals.json', filter: { name: 'JSON', extensions: ['json'] } }
+      return { data: buildPalsJson(snapshot), defaultName: 'palboard-pals.json', ...JSON_TYPE }
     case 'items-csv':
-      return { data: buildItemsCsv(snapshot), defaultName: 'palboard-items.csv', filter: { name: 'CSV', extensions: ['csv'] } }
+      return { data: buildItemsCsv(snapshot), defaultName: 'palboard-items.csv', ...CSV }
   }
 }

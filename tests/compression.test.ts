@@ -1,6 +1,6 @@
 import { deflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { SaveFormatError, decompressSave } from '../electron/parser/compression'
+import { SaveFormatError, decompressSave } from '../core/compression'
 
 /** Builds a .sav container around an already-compressed payload. */
 function container(opts: {
@@ -154,6 +154,38 @@ describe('decompressSave', () => {
       saveType: 0x31,
       payload,
     })
-    await expect(decompressSave(sav)).rejects.toThrow(/decompressed length mismatch/)
+    await expect(decompressSave(sav)).rejects.toThrow(/length mismatch/)
+  })
+
+  /**
+   * The inflate output buffer is pre-allocated from the header, which caps how
+   * much a hostile payload can make us allocate — but a fixed buffer also
+   * truncates an over-long stream silently. One spare byte is what keeps
+   * "exactly as declared" distinguishable from "more than declared".
+   */
+  it('rejects a payload that decompresses to more than the header declares', async () => {
+    const payload = deflateSync(GVAS_BODY)
+    const sav = container({
+      uncompressedLen: GVAS_BODY.length - 5, // understates the real size
+      compressedLen: payload.length,
+      magic: 'PlZ',
+      saveType: 0x31,
+      payload,
+    })
+    await expect(decompressSave(sav)).rejects.toThrow(/length mismatch/)
+  })
+
+  it('accepts a Uint8Array that is not a Buffer, as the browser supplies', async () => {
+    const payload = deflateSync(GVAS_BODY)
+    const sav = container({
+      uncompressedLen: GVAS_BODY.length,
+      compressedLen: payload.length,
+      magic: 'PlZ',
+      saveType: 0x31,
+      payload,
+    })
+    const asBytes = new Uint8Array(sav) // a copy, so `Buffer.isBuffer` is false
+    const result = await decompressSave(asBytes)
+    expect(result.gvas.toString('latin1')).toBe(GVAS_BODY.toString('latin1'))
   })
 })

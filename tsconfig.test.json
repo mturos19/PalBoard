@@ -1,15 +1,18 @@
 {
+  // Tests straddle both worlds: they exercise the Electron store and the Node
+  // filesystem watcher, and also the browser world sources. That needs Node
+  // types and the DOM lib together, which neither app project should have, so
+  // the suite gets its own project rather than loosening theirs.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
@@ -18,10 +21,18 @@
     "composite": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@main/*": ["electron/*"],
       "@core/*": ["core/*"],
       "@shared/*": ["shared/*"]
     }
   },
-  "include": ["electron/**/*.ts", "core/**/*.ts", "shared/**/*.ts", "electron.vite.config.ts"]
+  "include": [
+    "tests/**/*.ts",
+    "src/types/fs-access.d.ts",
+    "src/platform/**/*.ts",
+    "core/**/*.ts",
+    "shared/**/*.ts",
+    "electron/**/*.ts"
+  ]
 }

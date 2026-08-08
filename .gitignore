@@ -14,6 +14,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.claude/
 
 # Never commit save data — it contains player names and world state.
 *.sav

@@ -54,7 +54,7 @@ export function CommandPalette() {
   const snapshot = useSyncStore((s) => s.snapshot)
   const reload = useSyncStore((s) => s.reload)
   const exportData = useSyncStore((s) => s.exportData)
-  const revealSaveFolder = useSyncStore((s) => s.revealSaveFolder)
+  const browseForWorld = useSyncStore((s) => s.browseForWorld)
   const navigate = useNavigate()
 
   const [query, setQuery] = useState('')
@@ -86,7 +86,7 @@ export function CommandPalette() {
       { id: 'p-stats', label: 'Statistics', hint: 'Page', icon: BarChart3, keywords: 'charts graphs history', run: go('/statistics') },
       { id: 'p-settings', label: 'Settings', hint: 'Page', icon: Settings, keywords: 'preferences world', run: go('/settings') },
       { id: 'a-reload', label: 'Reload save now', hint: 'Action', icon: RefreshCw, keywords: 'refresh sync', run: () => { void reload(); setOpen(false) } },
-      { id: 'a-folder', label: 'Open save folder', hint: 'Action', icon: FolderOpen, keywords: 'explorer reveal', run: () => { void revealSaveFolder(); setOpen(false) } },
+      { id: 'a-open', label: 'Open a different save', hint: 'Action', icon: FolderOpen, keywords: 'folder switch world browse', run: () => { void browseForWorld(); setOpen(false) } },
       { id: 'a-export', label: 'Export pals as CSV', hint: 'Action', icon: Download, keywords: 'save file spreadsheet', run: () => { void exportData('pals-csv'); setOpen(false) } },
     ]
 
@@ -129,7 +129,7 @@ export function CommandPalette() {
       }
     }
     return list
-  }, [snapshot, navigate, setOpen, reload, openPal, exportData, revealSaveFolder])
+  }, [snapshot, navigate, setOpen, reload, openPal, exportData, browseForWorld])
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()

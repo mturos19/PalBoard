@@ -17,7 +17,6 @@ function snapshot(savedAt: number, pals = 3): SaveSnapshot {
   return {
     revision: 1,
     loadedAt: 0,
-    savePath: '',
     world: {
       worldId: WORLD_ID,
       name: 'Test',

@@ -5,7 +5,7 @@
  * world save does not record it.
  */
 import type { GvasFile, MapEntry, PropStruct, PropValue } from '../gvas/types'
-import type { PlayerRecords } from '../../../shared/domain'
+import type { PlayerRecords } from '@shared/domain'
 
 const asStruct = (v: PropValue | undefined): PropStruct | undefined =>
   v && typeof v === 'object' && !Array.isArray(v) && !Buffer.isBuffer(v)

@@ -284,7 +284,6 @@ export interface SaveSnapshot {
   revision: number
   /** When this snapshot was produced. */
   loadedAt: number
-  savePath: string
   world: WorldSummary
   guilds: Guild[]
   players: Player[]

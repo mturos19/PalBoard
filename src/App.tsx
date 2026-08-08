@@ -10,24 +10,25 @@ import { MapPage } from './pages/MapPage'
 import { PalsPage } from './pages/PalsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StatisticsPage } from './pages/StatisticsPage'
-import { WelcomePage } from './pages/WelcomePage'
+import { LandingPage } from './pages/LandingPage'
 import { connectSync, useSyncStore } from './stores/syncStore'
 import { useUiStore } from './stores/uiStore'
 
 export function App() {
   const hydrated = useSyncStore((s) => s.hydrated)
   const worldPath = useSyncStore((s) => s.worldPath)
-  const status = useSyncStore((s) => s.status)
 
-  // Subscribe to main-process state for the lifetime of the app.
+  // Subscribe to platform state for the lifetime of the app.
   useEffect(() => connectSync(), [])
   useGlobalShortcuts()
   useAlertNotifications()
 
   if (!hydrated) return <BootScreen />
 
-  // No world selected yet: onboarding takes over the whole window.
-  if (!worldPath && status !== 'loading') return <WelcomePage />
+  // No world open yet: the landing page takes over the whole window. It also
+  // owns the loading state, so a first-time visitor watches their save being
+  // read where they dropped it rather than on a blank shell.
+  if (!worldPath) return <LandingPage />
 
   return (
     <>

@@ -14,13 +14,13 @@
  */
 import { FArchiveReader } from '../gvas/reader'
 import type { GvasFile, MapEntry, PropStruct, PropValue } from '../gvas/types'
-import { RESOURCE_GROUPS } from '../../../shared/gamedata/items'
+import { RESOURCE_GROUPS } from '@shared/gamedata/items'
 import type {
   ItemStack,
   PlayerInventory,
   ResourceTotals,
   StorageSummary,
-} from '../../../shared/domain'
+} from '@shared/domain'
 
 export interface DecodedSlot {
   slotIndex: number
@@ -111,13 +111,23 @@ export interface InventoryBuild {
 }
 
 /**
- * Splits containers into player pouches (identified via each player save's
- * InventoryInfo) and world storage, then aggregates both.
+ * Splits containers into player pouches and base storage, then aggregates both.
+ *
+ * Pouches are identified through each player save's InventoryInfo; base storage
+ * is the set of containers owned by a structure standing inside a base camp the
+ * player founded (see `scanMapObjects`).
+ *
+ * Everything else in `ItemContainerSaveData` is world content the player does
+ * not own — unopened treasure chests, enemy camp loot, drop tables for wild
+ * pals — and is deliberately excluded. It dominates the map by count (typically
+ * thousands of containers against a few dozen real chests), so counting it
+ * reports the island's gold as the player's own.
  */
 export function buildInventories(
   wsd: PropStruct,
   playerSaves: Map<string, GvasFile>,
   playerNames: Map<string, string>,
+  baseContainers: ReadonlySet<string>,
   warnings: string[],
 ): InventoryBuild {
   const containers = decodeContainers(wsd, warnings)
@@ -149,15 +159,19 @@ export function buildInventories(
     })
   }
 
-  // Everything unclaimed is world storage: base chests, feed boxes, wooden
-  // chests in the wild, dropped bags.
+  // Base storage: chests, feed boxes and cooling boxes standing in a base.
   const storageSlots: DecodedSlot[] = []
   let totalSlots = 0
   let usedSlots = 0
   let nearFull = 0
   let containerCount = 0
+  let ignored = 0
   for (const c of containers.values()) {
     if (claimed.has(c.id)) continue
+    if (!baseContainers.has(c.id)) {
+      ignored++
+      continue
+    }
     containerCount++
     totalSlots += c.slotNum
     usedSlots += c.slots.length
@@ -165,14 +179,24 @@ export function buildInventories(
     storageSlots.push(...c.slots)
   }
 
-  const items = aggregate(storageSlots)
+  // A world with bases but no reachable storage means the chest-to-container
+  // link moved, not that the player owns nothing — say so rather than showing
+  // an empty inventory as fact.
+  if (containerCount === 0 && ignored > 0 && baseContainers.size === 0) {
+    warnings.push(
+      `no storage containers could be attributed to a base (${ignored} unowned containers seen) — the chest container link may have changed`,
+    )
+  }
 
-  // Resource totals span storage AND pouches — the player carrying 4k ingots
-  // still owns them. Sum per group over exact-id lists.
-  const everySlot: DecodedSlot[] = [...storageSlots]
-  for (const c of containers.values()) if (claimed.has(c.id)) everySlot.push(...c.slots)
+  // Resource totals span base storage AND pouches — the player carrying 4k
+  // ingots still owns them. Sum per group over exact-id lists.
+  const items = aggregate(storageSlots)
   const totalsById = new Map<string, number>()
-  for (const s of everySlot) totalsById.set(s.itemId, (totalsById.get(s.itemId) ?? 0) + s.count)
+  for (const s of storageSlots) totalsById.set(s.itemId, (totalsById.get(s.itemId) ?? 0) + s.count)
+  for (const c of containers.values()) {
+    if (!claimed.has(c.id)) continue
+    for (const s of c.slots) totalsById.set(s.itemId, (totalsById.get(s.itemId) ?? 0) + s.count)
+  }
 
   const resources: ResourceTotals = {}
   for (const group of RESOURCE_GROUPS) {

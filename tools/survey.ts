@@ -3,11 +3,11 @@
  * how expensive each subtree is. Run with `npx vite-node tools/survey.ts <dir>`.
  */
 import { readFileSync } from 'node:fs'
-import { decompressSave } from '../electron/parser/compression'
-import { FArchiveReader } from '../electron/parser/gvas/reader'
-import { parseGvas, parseGvasHeader } from '../electron/parser/gvas/parser'
-import { levelParsePlan } from '../electron/parser/palworld/hints'
-import type { MapEntry, PropStruct, PropValue } from '../electron/parser/gvas/types'
+import { decompressSave } from '../core/compression'
+import { FArchiveReader } from '../core/gvas/reader'
+import { parseGvas, parseGvasHeader } from '../core/gvas/parser'
+import { levelParsePlan } from '../core/palworld/hints'
+import type { MapEntry, PropStruct, PropValue } from '../core/gvas/types'
 
 const dir = process.argv[2]
 if (!dir) throw new Error('usage: survey.ts <world save dir>')

@@ -11,10 +11,12 @@ interface PendingLoad {
 }
 const pending: PendingLoad[] = []
 
-vi.mock('../electron/parser/loader', () => ({
-  loadWorld: (worldDir: string) =>
+vi.mock('../core/loader', () => ({
+  // The store hands `loadWorld` a WorldSource, whose `worldId` is the folder the
+  // desktop adapter was pointed at — enough to tell the two worlds apart here.
+  loadWorld: (source: { worldId: string }) =>
     new Promise<SaveSnapshot>((resolve, reject) => {
-      pending.push({ worldDir, resolve, reject })
+      pending.push({ worldDir: source.worldId, resolve, reject })
     }),
 }))
 
@@ -66,7 +68,6 @@ function snapshotFor(worldPath: string): SaveSnapshot {
   return {
     revision: 0,
     loadedAt: 0,
-    savePath: worldPath,
     world: {
       worldId: worldPath,
       name: worldPath,
@@ -148,11 +149,11 @@ describe('SaveStore', () => {
     await settle()
 
     expect(store.state.worldPath).toBe('world-b')
-    expect(store.state.snapshot?.savePath).not.toBe('world-a')
+    expect(store.state.snapshot?.world.worldId).not.toBe('world-a')
 
     // world-b is parsed instead, and that result is kept.
     await completeLoad()
-    expect(store.state.snapshot?.savePath).toBe('world-b')
+    expect(store.state.snapshot?.world.worldId).toBe('world-b')
     expect(store.state.status).toBe('ready')
   })
 

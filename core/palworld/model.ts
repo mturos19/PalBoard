@@ -17,8 +17,8 @@ import { decodeBaseCamp, decodeCharacter, decodeGroup } from './rawdata'
 import { buildInventories } from './inventory'
 import { buildRecords } from './records'
 import { buildAlerts } from './alerts'
-import { isHumanCharacter, speciesInfo } from '../../../shared/gamedata/species'
-import { SANITY_CONCERN } from '../../../shared/domain'
+import { isHumanCharacter, speciesInfo } from '@shared/gamedata/species'
+import { SANITY_CONCERN } from '@shared/domain'
 import type {
   BaseCamp,
   DashboardStats,
@@ -32,7 +32,7 @@ import type {
   SaveSnapshot,
   Vec3,
   WorldSummary,
-} from '../../../shared/domain'
+} from '@shared/domain'
 
 // --- small typed accessors ----------------------------------------------------
 
@@ -155,7 +155,6 @@ function ticksToEpochMs(v: PropValue | undefined, fallback: number): number {
 
 export interface BuildInput {
   worldId: string
-  savePath: string
   level: GvasFile
   meta: MetaSaves
   /** Parsed `Players/<uid>.sav` files, keyed by lowercase player UID. */
@@ -293,8 +292,8 @@ export function buildSnapshot(
     guild?.players.push({ uid: player.uid, name: player.name, level: player.level })
   }
 
-  // --- buildings per base ------------------------------------------------------
-  countBuildings(wsd, baseById, warnings)
+  // --- buildings per base, and which containers those buildings own -----------
+  const { baseContainers } = scanMapObjects(wsd, baseById, warnings)
 
   // --- workers per base --------------------------------------------------------
   for (const pal of pals) {
@@ -310,6 +309,7 @@ export function buildSnapshot(
     wsd,
     input.playerSaves,
     playerNames,
+    baseContainers,
     warnings,
   )
   const records = buildRecords(input.playerSaves, playerNames)
@@ -335,7 +335,6 @@ export function buildSnapshot(
   return {
     revision: 0,
     loadedAt: Date.now(),
-    savePath: input.savePath,
     world: buildWorld(input.worldId, level, input.meta, input.levelModifiedAt),
     guilds,
     players,
@@ -375,35 +374,86 @@ function decodeWorkerDirectorContainerId(buf: Buffer): string | null {
   }
 }
 
+/** Module key under which a placed object records the container it owns. */
+const ITEM_CONTAINER_MODULE = 'EPalMapObjectConcreteModelModuleType::ItemContainer'
+
+interface MapObjectScan {
+  /** Item containers belonging to something the player built inside a base. */
+  baseContainers: Set<string>
+}
+
 /**
- * `MapObjectSaveData[].Model.RawData` begins with four GUIDs, the third of which
- * is the owning base camp. Buildings placed outside a base carry a null id.
+ * Walks every placed object once, attributing it to a base camp and collecting
+ * the storage containers those objects own.
+ *
+ * `Model.RawData` begins with four GUIDs, the third of which is the owning base
+ * camp; objects placed outside a base carry a null id. A chest additionally
+ * carries an `ItemContainer` module whose RawData opens with the id of its
+ * container in `ItemContainerSaveData`.
+ *
+ * That link is what separates the player's storage from the rest of the world.
+ * `ItemContainerSaveData` holds every container on the map — thousands of them
+ * are unopened treasure chests and enemy loot with a few hundred gold apiece —
+ * and summing all of them reports the whole island's contents as if the player
+ * owned it. Only containers reached through a base the player founded are
+ * theirs.
  */
-function countBuildings(
+function scanMapObjects(
   wsd: PropStruct,
   baseById: Map<string, BaseCamp>,
   warnings: string[],
-): void {
+): MapObjectScan {
   const objects = list(wsd.MapObjectSaveData)
+  const baseContainers = new Set<string>()
   let unattributed = 0
+
   for (const obj of objects) {
-    const raw = asStruct(asStruct(obj)?.Model)?.RawData
+    const o = asStruct(obj)
+    const raw = asStruct(o?.Model)?.RawData
     if (!Buffer.isBuffer(raw) || raw.length < 64) continue
+
+    let base: BaseCamp | undefined
     try {
       const r = new FArchiveReader(raw)
       r.guid() // instance id
       r.guid() // concrete model instance id
-      const baseCampId = r.guid()
-      const base = baseById.get(baseCampId)
-      if (base) base.buildingCount++
-      else unattributed++
+      base = baseById.get(r.guid())
     } catch {
       unattributed++
+      continue
     }
+
+    if (!base) {
+      unattributed++
+      continue
+    }
+    base.buildingCount++
+
+    const containerId = ownedContainerId(o)
+    if (containerId) baseContainers.add(containerId)
   }
+
   if (objects.length && unattributed === objects.length) {
     warnings.push('no buildings could be attributed to a base — MapObject layout may have changed')
   }
+  return { baseContainers }
+}
+
+/** The container id a placed object owns, when it is a storage object. */
+function ownedContainerId(obj: PropStruct | undefined): string | null {
+  const modules = asStruct(obj?.ConcreteModel)?.ModuleMap
+  if (!Array.isArray(modules)) return null
+  for (const entry of modules as MapEntry[]) {
+    if (entry.key !== ITEM_CONTAINER_MODULE) continue
+    const raw = asStruct(entry.value)?.RawData
+    if (!Buffer.isBuffer(raw) || raw.length < 16) return null
+    try {
+      return new FArchiveReader(raw).guid()
+    } catch {
+      return null
+    }
+  }
+  return null
 }
 
 function buildPlayer(

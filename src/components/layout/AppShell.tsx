@@ -37,33 +37,31 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-full flex-col bg-canvas">
-      {/*
-       * Title bar: the drag region for the frameless window. Native window
-       * controls are overlaid top-right by Electron (titleBarOverlay), so the
-       * right side keeps clear of them.
-       */}
-      <header className="app-drag flex h-10 shrink-0 items-center gap-3 border-b border-line-soft bg-[#0d1017] pl-3 pr-[150px]">
-        <div className="flex items-center gap-2">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line-soft bg-[#0d1017] px-3 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <div className="grid size-5 place-items-center rounded-md bg-accent-gradient text-[10px] font-black text-canvas">
             P
           </div>
           <span className="text-[13px] font-semibold tracking-tight">PalBoard</span>
         </div>
-        <span className="text-ink-faint/60">/</span>
-        <span className="min-w-0 truncate text-[13px] text-ink-muted">
+        <span className="hidden text-ink-faint/60 sm:inline">/</span>
+        <span className="hidden min-w-0 truncate text-[13px] text-ink-muted sm:inline">
           {world?.name ?? 'No world'}
           <span className="text-ink-faint"> · {TITLES[location.pathname] ?? ''}</span>
         </span>
 
-        <div className="app-no-drag ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setPaletteOpen(true)}
             className="flex h-8 items-center gap-2 rounded-lg border border-line-soft bg-surface-2 px-2.5 text-xs text-ink-faint transition-colors hover:border-line hover:text-ink-muted"
             title="Search everything"
+            aria-label="Search everything"
           >
             <Command size={12} />
-            <span>Search</span>
-            <kbd className="rounded border border-line-soft bg-surface px-1 text-[9px]">Ctrl K</kbd>
+            <span className="hidden md:inline">Search</span>
+            <kbd className="hidden rounded border border-line-soft bg-surface px-1 text-[9px] md:inline">
+              Ctrl K
+            </kbd>
           </button>
           <AlertsBell />
           <SyncIndicator />
@@ -71,7 +69,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-52 shrink-0 flex-col border-r border-line-soft bg-surface">
+        {/* Below md the sidebar is replaced by the tab bar at the foot. */}
+        <aside className="hidden w-52 shrink-0 flex-col border-r border-line-soft bg-surface md:flex">
           <nav className="flex flex-1 flex-col gap-0.5 p-2 pt-3">
             {NAV.map(({ to, label, icon: Icon, end }) => (
               <NavLink
@@ -121,6 +120,27 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>
+
+      {/* Phone navigation. Scrolls horizontally rather than cramming seven
+          labels into 360px. */}
+      <nav className="flex shrink-0 gap-1 overflow-x-auto border-t border-line-soft bg-surface px-2 py-1.5 md:hidden">
+        {NAV.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) =>
+              cx(
+                'flex min-w-16 shrink-0 flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] transition-colors',
+                isActive ? 'bg-surface-3 text-accent' : 'text-ink-faint',
+              )
+            }
+          >
+            <Icon size={16} strokeWidth={2} />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

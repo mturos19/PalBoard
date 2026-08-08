@@ -9,7 +9,7 @@
  * of each row's span. Every extraction is validated by the caller against
  * known pairs before being trusted.
  */
-import { FArchiveReader } from '../../electron/parser/gvas/reader'
+import { FArchiveReader } from '../../core/gvas/reader'
 
 /** Plausible FString at `at`: length-prefixed, printable, null-terminated. */
 function tryString(buf: Buffer, at: number): { value: string; end: number } | null {

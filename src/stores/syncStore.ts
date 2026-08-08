@@ -1,20 +1,21 @@
 /**
- * Mirrors the main process's {@link SyncState} into the renderer.
+ * Mirrors the platform's {@link SyncState} into the UI.
  *
- * The main process is authoritative: this store never mutates domain data, it
- * only caches the last pushed state and exposes the commands that ask main to
- * change something. That keeps a single source of truth across two processes.
+ * `window.palboard` is authoritative: this store never mutates domain data, it
+ * only caches the last pushed state and exposes the commands that ask for a
+ * change. That keeps a single source of truth whether the save is being read by
+ * a worker in this page or by a desktop main process.
  *
  * Every command swallows its own failure. These are called from click handlers,
  * where an unhandled rejection would surface as a console error detached from
- * the button that caused it — and main already reports real problems through
- * `SyncState.error`, which the UI renders.
+ * the button that caused it — and the platform already reports real problems
+ * through `SyncState.error`, which the UI renders.
  */
 import { create } from 'zustand'
 import type { ExportKind, SyncState } from '@shared/ipc'
 
 interface SyncStore extends SyncState {
-  /** False until the first state has arrived from main. */
+  /** False until the first state has arrived. */
   hydrated: boolean
   setState(state: SyncState): void
   selectWorld(path: string): Promise<void>
@@ -22,7 +23,13 @@ interface SyncStore extends SyncState {
   reload(): Promise<void>
   revealSaveFolder(): Promise<void>
   rescanWorlds(): Promise<void>
-  /** Opens a save dialog; resolves to the written path, or null if cancelled. */
+  /** Adopts a folder the user dropped or picked with a file input. */
+  openFiles(files: File[]): Promise<void>
+  /** Opens a folder PalBoard can re-read as the game saves. */
+  openDirectory(): Promise<void>
+  /** Drops the world and clears anything stored in this browser. */
+  forget(): Promise<void>
+  /** Downloads an export; resolves to the file name, or null if unavailable. */
   exportData(kind: ExportKind): Promise<string | null>
 }
 
@@ -57,6 +64,9 @@ export const useSyncStore = create<SyncStore>((set) => {
     selectWorld: (path) => apply('opening the world', () => window.palboard.selectWorld(path)),
     browseForWorld: () => apply('choosing a folder', () => window.palboard.browseForWorld()),
     reload: () => apply('reloading the save', () => window.palboard.reload()),
+    openFiles: (files) => apply('reading that folder', () => window.palboard.openFiles(files)),
+    openDirectory: () => apply('opening that folder', () => window.palboard.openDirectory()),
+    forget: () => apply('clearing the world', () => window.palboard.forget()),
     rescanWorlds: () =>
       apply('scanning for saves', async () => {
         await window.palboard.discoverWorlds()

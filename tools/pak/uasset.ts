@@ -2,7 +2,7 @@
  * Minimal legacy .uasset reader: package summary + name map. Enough to
  * interpret FName references inside the companion .uexp export data.
  */
-import { FArchiveReader } from '../../electron/parser/gvas/reader'
+import { FArchiveReader } from '../../core/gvas/reader'
 
 const PACKAGE_TAG = 0x9e2a83c1
 

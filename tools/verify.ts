@@ -3,8 +3,9 @@
  * Run with `npx vite-node tools/verify.ts [world dir]`.
  */
 import { discoverWorlds } from '../electron/locator'
-import { loadWorld } from '../electron/parser/loader'
-import { computeStats } from '../electron/parser/palworld/model'
+import { loadWorld } from '../core/loader'
+import { fsWorldSource } from '../electron/worldSource'
+import { computeStats } from '../core/palworld/model'
 
 const explicit = process.argv[2]
 const dir = explicit ?? (await discoverWorlds())[0]?.path
@@ -12,7 +13,7 @@ if (!dir) throw new Error('no Palworld world found; pass one as an argument')
 console.log('world dir:', dir, explicit ? '(explicit)' : '(auto-detected)')
 
 const t0 = performance.now()
-const snap = await loadWorld(dir)
+const snap = await loadWorld(fsWorldSource(dir))
 const totalMs = performance.now() - t0
 const stats = computeStats(snap)
 

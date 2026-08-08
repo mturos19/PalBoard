@@ -18,6 +18,18 @@ const INK_FAINT = '#667085'
 const LINE = '#272d3b'
 const ACCENT = 'var(--color-accent)'
 
+/**
+ * Shared tooltip styling.
+ *
+ * `itemStyle` is not optional decoration. Recharts builds each row as
+ * `{ color: entry.color || '#000', ...itemStyle }` — so any series without a
+ * colour of its own falls back to black, which on this palette is black text
+ * on a near-black card. Pie sectors hit that path every time, because their
+ * colour lives on the `<Cell>` rather than on the series. Setting the colour
+ * here is what keeps every tooltip readable; because `itemStyle` is spread
+ * last it also wins for series that do carry a colour, which costs a little
+ * per-series tinting and buys legibility everywhere.
+ */
 const tooltipStyle = {
   contentStyle: {
     background: '#161a23',
@@ -26,7 +38,8 @@ const tooltipStyle = {
     fontSize: 12,
     color: '#e9ecf3',
   },
-  labelStyle: { color: '#9aa4b8' },
+  itemStyle: { color: '#e9ecf3' },
+  labelStyle: { color: '#9aa4b8', fontWeight: 500 },
   cursor: { fill: '#1d222e', opacity: 0.5 },
 } as const
 

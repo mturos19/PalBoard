@@ -14,7 +14,7 @@
 import { writeFile } from 'node:fs/promises'
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { defaultSaveRoots } from '../locator'
-import { buildExport, type ExportKind } from '../services/exporter'
+import { buildExport, type ExportKind } from '@core/exporter'
 import type { SaveStore } from '../services/saveStore'
 import { IPC } from '../../shared/ipc'
 

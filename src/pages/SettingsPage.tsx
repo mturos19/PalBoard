@@ -1,4 +1,5 @@
-import { Bell, FolderOpen, FolderSearch, Palette, RefreshCw, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { Bell, FolderSearch, Palette, Radio, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { NAME_COUNTS } from '@shared/gamedata/names'
 import { SPECIES_TABLE_SIZE } from '@shared/gamedata/species'
 import { Card, CardTitle } from '@/components/ui/Card'
@@ -21,17 +22,31 @@ const SHORTCUTS: Array<[string, string]> = [
 
 export function SettingsPage() {
   const worldPath = useSyncStore((s) => s.worldPath)
-  const worlds = useSyncStore((s) => s.worlds)
   const snapshot = useSyncStore((s) => s.snapshot)
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt)
-  const selectWorld = useSyncStore((s) => s.selectWorld)
   const browseForWorld = useSyncStore((s) => s.browseForWorld)
   const reload = useSyncStore((s) => s.reload)
-  const revealSaveFolder = useSyncStore((s) => s.revealSaveFolder)
+  const forget = useSyncStore((s) => s.forget)
   const accent = useUiStore((s) => s.accent)
   const setAccent = useUiStore((s) => s.setAccent)
   const notificationsEnabled = useUiStore((s) => s.notificationsEnabled)
   const setNotificationsEnabled = useUiStore((s) => s.setNotificationsEnabled)
+
+  const canOpenDirectory = window.palboard.canOpenDirectory
+  // Only a world opened as a folder can be followed — uploaded files are a
+  // snapshot of the moment they were picked.
+  const canFollow = window.palboard.canFollow()
+  const [live, setLiveState] = useState(() => window.palboard.isLive())
+  const toggleLive = (next: boolean) => {
+    window.palboard.setLive(next)
+    setLiveState(window.palboard.isLive())
+  }
+
+  const followHint = canFollow
+    ? 'Re-reads the folder every few seconds and refreshes after each autosave.'
+    : canOpenDirectory
+      ? 'This save was uploaded, so it cannot change. Use “Open another” and choose the folder to follow it live.'
+      : 'Needs a browser that can open a folder — Chrome, Edge or Opera. Elsewhere, use Reload.'
 
   const d = snapshot?.diagnostics
 
@@ -48,67 +63,30 @@ export function SettingsPage() {
                 <RefreshCw size={12} /> Reload
               </button>
               <button
-                onClick={() => void revealSaveFolder()}
-                className="flex items-center gap-1.5 rounded-lg border border-line-soft bg-surface-2 px-2.5 py-1.5 text-xs text-ink-muted transition-colors hover:border-line hover:text-ink"
+                onClick={() => void browseForWorld()}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-canvas transition-opacity hover:opacity-90"
               >
-                <FolderOpen size={12} /> Open folder
+                <FolderSearch size={12} /> Open another
               </button>
             </div>
           }
         >
           Current save
         </CardTitle>
-        <p className="break-all font-mono text-xs text-ink-muted">{worldPath ?? 'None selected'}</p>
+        <p className="break-all font-mono text-xs text-ink-muted">{worldPath ?? 'None open'}</p>
         <p className="mt-1 text-[11px] text-ink-faint">
-          Last synced {formatRelativeTime(lastSyncedAt)}
+          Last read {formatRelativeTime(lastSyncedAt)}
           {snapshot ? ` · revision ${snapshot.revision}` : ''}
         </p>
-      </Card>
 
-      <Card index={1}>
-        <CardTitle
-          action={
-            <button
-              onClick={() => void browseForWorld()}
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-canvas transition-opacity hover:opacity-90"
-            >
-              <FolderSearch size={12} /> Browse…
-            </button>
-          }
-        >
-          Switch world
-        </CardTitle>
-        {worlds.length === 0 ? (
-          <p className="text-sm text-ink-faint">No worlds auto-detected.</p>
-        ) : (
-          <ul className="divide-y divide-line-soft">
-            {worlds.map((world) => {
-              const active = world.path === worldPath
-              return (
-                <li key={world.path} className="flex items-center gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-xs text-ink">{world.worldId}</p>
-                    <p className="text-[11px] text-ink-faint">
-                      Saved {formatRelativeTime(world.modifiedAt)} · {formatBytes(world.sizeBytes)}
-                    </p>
-                  </div>
-                  {active ? (
-                    <span className="shrink-0 rounded-full bg-mint/15 px-2 py-0.5 text-[11px] text-mint">
-                      Active
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => void selectWorld(world.path)}
-                      className="shrink-0 text-xs text-accent hover:underline"
-                    >
-                      Open
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
+        <div className="mt-4 flex items-center gap-3 border-t border-line-soft pt-4">
+          <Radio size={15} className={live ? 'text-mint' : 'text-ink-faint'} />
+          <span className="flex-1 text-sm text-ink-muted">
+            Follow the save while I play
+            <span className="block text-[11px] text-ink-faint">{followHint}</span>
+          </span>
+          <Toggle checked={live} disabled={!canFollow} onChange={toggleLive} />
+        </div>
       </Card>
 
       {d ? (
@@ -162,25 +140,22 @@ export function SettingsPage() {
         <div className="mt-4 flex items-center gap-3">
           <Bell size={15} className="text-ink-faint" />
           <span className="flex-1 text-sm text-ink-muted">
-            Desktop notifications for critical alerts
-            <span className="block text-[11px] text-ink-faint">Starving or sick pals raise a system notification</span>
+            Notify me about critical alerts
+            <span className="block text-[11px] text-ink-faint">
+              Starving or sick pals raise a system notification
+            </span>
           </span>
-          <button
-            role="switch"
-            aria-checked={notificationsEnabled}
-            onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-            className={cx(
-              'relative h-5 w-9 rounded-full transition-colors',
-              notificationsEnabled ? 'bg-accent' : 'bg-surface-3',
-            )}
-          >
-            <span
-              className={cx(
-                'absolute top-0.5 size-4 rounded-full bg-ink transition-transform',
-                notificationsEnabled ? 'translate-x-4.5 left-0' : 'left-0.5',
-              )}
-            />
-          </button>
+          <Toggle
+            checked={notificationsEnabled}
+            onChange={(next) => {
+              // The browser only grants permission from a user gesture, so ask
+              // on the click that turns this on rather than at page load.
+              if (next && 'Notification' in window && Notification.permission === 'default') {
+                void Notification.requestPermission()
+              }
+              setNotificationsEnabled(next)
+            }}
+          />
         </div>
       </Card>
 
@@ -201,21 +176,33 @@ export function SettingsPage() {
       <Card index={5}>
         <div className="flex items-start gap-3">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-mint" />
-          <div>
-            <p className="text-sm font-medium">Read-only by design</p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Your save stays on your machine</p>
             <p className="mt-0.5 text-xs text-ink-muted">
-              PalBoard opens your save files for reading only and never writes to them. It is safe to
-              keep running while you play.
+              PalBoard decodes the save inside this page. It is never uploaded — there is no server
+              to upload it to — and it is opened for reading only, so playing on afterwards is safe.
             </p>
-            <p className="mt-2 text-[11px] text-ink-faint">
-              PalBoard 0.2 · names extracted from the game's own data tables ({NAME_COUNTS.pals} pals,{' '}
-              {NAME_COUNTS.items.toLocaleString()} items, {NAME_COUNTS.skills.toLocaleString()} skills) ·
-              elements curated for {SPECIES_TABLE_SIZE} species, plus the game's own subspecies
-              suffixes. Re-run <code className="font-mono">npm run extract-gamedata</code> after a game
-              update.
+            <p className="mt-2 text-xs text-ink-muted">
+              The only thing kept between visits is the chart history below: a few counts per save,
+              in this browser's local storage. Closing the tab forgets everything else.
             </p>
+            <button
+              onClick={() => void forget()}
+              className="mt-3 flex items-center gap-1.5 rounded-lg border border-rose/30 bg-rose/10 px-2.5 py-1.5 text-xs text-rose transition-colors hover:bg-rose/15"
+            >
+              <Trash2 size={12} /> Close this save and clear stored history
+            </button>
           </div>
         </div>
+      </Card>
+
+      <Card index={6}>
+        <p className="text-[11px] leading-relaxed text-ink-faint">
+          PalBoard 0.3 · names extracted from the game's own data tables ({NAME_COUNTS.pals} pals,{' '}
+          {NAME_COUNTS.items.toLocaleString()} items, {NAME_COUNTS.skills.toLocaleString()} skills) ·
+          elements curated for {SPECIES_TABLE_SIZE} species, plus the game's own subspecies suffixes.
+          Not affiliated with Pocketpair.
+        </p>
       </Card>
     </div>
   )
@@ -227,5 +214,36 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="whitespace-nowrap text-ink-faint">{label}</dt>
       <dd className="truncate font-medium tabular-nums text-ink">{value}</dd>
     </div>
+  )
+}
+
+function Toggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean
+  disabled?: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+        checked ? 'bg-accent' : 'bg-surface-3',
+        disabled && 'cursor-not-allowed opacity-40',
+      )}
+    >
+      <span
+        className={cx(
+          'absolute top-0.5 size-4 rounded-full bg-ink transition-all',
+          checked ? 'left-4.5' : 'left-0.5',
+        )}
+      />
+    </button>
   )
 }

@@ -10,7 +10,7 @@
  */
 import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { inflateSync } from 'node:zlib'
-import { FArchiveReader } from '../../electron/parser/gvas/reader'
+import { FArchiveReader } from '../../core/gvas/reader'
 
 const PAK_MAGIC = 0x5a6f12e1
 

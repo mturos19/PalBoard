@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { BrowserWindow, Menu, app, nativeImage, screen, session, shell } from 'electron'
 import { registerIpc } from './api/ipc'
-import { preloadOodle } from './parser/compression'
+import { preloadOodle } from '@core/compression'
 import { loadPrefs, savePrefs } from './services/prefs'
 import { SaveStore } from './services/saveStore'
 

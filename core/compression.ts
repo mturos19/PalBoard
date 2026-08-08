@@ -18,8 +18,12 @@
  * Oodle is a proprietary codec, so we decode with `ooz-wasm` — a WebAssembly
  * build of the open-source `ooz` reimplementation. It is decode-only, which is
  * all a read-only dashboard needs.
+ *
+ * Both codecs here run unchanged in Node and in the browser: `fflate` is a
+ * pure-JS zlib and `ooz-wasm` is WebAssembly, so this module has no platform
+ * dependency and the same parser serves the desktop app and the web build.
  */
-import { inflateSync } from 'node:zlib'
+import { unzlibSync } from 'fflate'
 
 type OozDecompress = (data: Uint8Array, rawSize: number) => Uint8Array
 
@@ -82,20 +86,35 @@ export class SaveFormatError extends Error {
 }
 
 /**
- * Runs zlib inflate with a hard output cap, translating any failure into a
+ * Runs zlib inflate into a fixed-size buffer, translating any failure into a
  * {@link SaveFormatError}.
  *
- * Without `maxOutputLength`, zlib grows its output buffer to whatever the stream
- * asks for, so a malformed or hostile payload decompresses until the process
- * dies. The cap is the size the header already promised, which makes a
- * disagreement a clean error instead of unbounded memory growth.
+ * Left to allocate freely, inflate grows its output to whatever the stream asks
+ * for, so a malformed or hostile payload decompresses until the process dies.
+ * Pre-allocating the size the header already promised makes a disagreement a
+ * clean error instead of unbounded memory growth.
+ *
+ * The buffer is one byte longer than the declared size so that over-long and
+ * exact streams stay distinguishable. `fflate` returns the bytes it actually
+ * wrote when the buffer has room and silently truncates when it does not, so a
+ * stream longer than declared comes back at `expected + 1` — a mismatch the
+ * caller rejects — rather than passing as a correct decode.
  */
-function inflate(payload: Buffer, maxOutputLength: number, what: string): Buffer {
+function inflate(payload: Uint8Array, expectedLength: number, what: string): Buffer {
+  let out: Uint8Array
   try {
-    return inflateSync(payload, { maxOutputLength })
+    out = unzlibSync(payload, { out: new Uint8Array(expectedLength + 1) })
   } catch (err) {
     throw new SaveFormatError(`${what} failed to decompress: ${(err as Error).message}`, { cause: err })
   }
+  if (out.length !== expectedLength) {
+    throw new SaveFormatError(
+      `${what} length mismatch: header declares ${expectedLength}, stream produced ${
+        out.length > expectedLength ? `more than ${expectedLength}` : String(out.length)
+      }`,
+    )
+  }
+  return Buffer.from(out.buffer, out.byteOffset, out.length)
 }
 
 interface ContainerHeader {
@@ -139,7 +158,12 @@ function readHeader(data: Buffer): ContainerHeader {
  * Throws {@link SaveFormatError} for anything that is not a recognised Palworld
  * container so callers can distinguish "wrong file" from "corrupt file".
  */
-export async function decompressSave(data: Buffer): Promise<SaveContainer> {
+export async function decompressSave(input: Uint8Array): Promise<SaveContainer> {
+  // Browsers hand us a plain Uint8Array off a File; wrap rather than copy so the
+  // header reads and payload slices below can use Buffer's typed accessors.
+  const data = Buffer.isBuffer(input)
+    ? input
+    : Buffer.from(input.buffer, input.byteOffset, input.byteLength)
   const { uncompressedLen, compressedLen, magic, saveType, dataOffset } = readHeader(data)
 
   if (magic !== MAGIC_PLZ && magic !== MAGIC_PLM) {
@@ -192,11 +216,6 @@ export async function decompressSave(data: Buffer): Promise<SaveContainer> {
     // The outer pass yields the intermediate stream, whose length the header
     // records as `compressedLen` — not the final GVAS size.
     const once = inflate(rest, compressedLen, 'double-zlib outer pass')
-    if (once.length !== compressedLen) {
-      throw new SaveFormatError(
-        `double-zlib inner length mismatch: expected ${compressedLen}, got ${once.length}`,
-      )
-    }
     gvas = inflate(once, uncompressedLen, 'double-zlib inner pass')
     codec = 'zlib-double'
   } else if (saveType === 0x31 || saveType === 0x30) {
