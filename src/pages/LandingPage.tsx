@@ -86,34 +86,36 @@ export function LandingPage() {
                 <code className="mx-1 font-mono">SaveGames</code> folder above it.
               </p>
 
+              {/*
+                The plain file input is the primary action, not the fancier
+                folder picker. Chrome refuses to open anything under AppData
+                through the File System Access API ("contains system files"),
+                and that is exactly where Palworld keeps Steam saves — so the
+                better-looking button is a dead end for most people. The upload
+                path uses an ordinary OS dialog and always works.
+              */}
               <div className="mt-5 flex flex-col items-center justify-center gap-2 sm:flex-row">
-                {canOpenDirectory ? (
-                  <button
-                    onClick={() => void openDirectory()}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-canvas transition-opacity hover:opacity-90 sm:w-auto"
-                  >
-                    <FolderOpen size={15} />
-                    Choose save folder
-                  </button>
-                ) : null}
                 <button
                   onClick={() => inputRef.current?.click()}
-                  className={cx(
-                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors sm:w-auto',
-                    canOpenDirectory
-                      ? 'border border-line-soft bg-surface text-ink-muted hover:border-line hover:text-ink'
-                      : 'bg-accent text-canvas hover:opacity-90',
-                  )}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-canvas transition-opacity hover:opacity-90 sm:w-auto"
                 >
                   <FolderOpen size={15} />
-                  {canOpenDirectory ? 'Browse instead' : 'Choose save folder'}
+                  Choose save folder
                 </button>
               </div>
 
               {canOpenDirectory ? (
-                <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-ink-faint">
-                  <Radio size={11} className="text-mint" />
-                  Choosing a folder also keeps the dashboard live while you play.
+                <p className="mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-ink-faint">
+                  <button
+                    onClick={() => void openDirectory()}
+                    className="inline-flex items-center gap-1 text-accent hover:underline"
+                  >
+                    <Radio size={11} />
+                    Open as a live folder
+                  </button>{' '}
+                  instead to auto-refresh while you play. Chrome only allows that outside{' '}
+                  <code className="font-mono">AppData</code>, so it suits dedicated servers and
+                  Linux — a normal Windows save will be refused.
                 </p>
               ) : null}
 
@@ -187,6 +189,10 @@ export function LandingPage() {
               <code className="font-mono">Level.sav</code>, or just drop the whole{' '}
               <code className="font-mono">SaveGames</code> folder and PalBoard will find the world
               you played last.
+            </p>
+            <p className="mt-2 text-[11px] text-ink-faint">
+              On Windows, <code className="font-mono">AppData</code> is hidden — paste the path
+              into the address bar of the file dialog rather than hunting for it.
             </p>
           </div>
         </details>

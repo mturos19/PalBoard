@@ -50,16 +50,30 @@ stored copy immediately and offers a **Reconnect** button in Settings to resume 
 **Forget this save** in Settings erases all of it — bytes, chart history and folder
 permission — and is verified to actually do so by the browser driver.
 
-## Live sync
+## Live sync, and why it is the secondary path
 
-| Browser | How you open a save | Follows autosaves |
+PalBoard can follow a save as the game writes it: a 5-second timer checks `Level.sav`'s
+mtime — one stat call, not a 32 MB reparse — and re-reads only when it moves. That needs a
+`FileSystemDirectoryHandle`, which only the File System Access API provides.
+
+**Chromium refuses to hand out a handle for anything under `AppData`.** Both
+`DIR_ROAMING_APP_DATA` and `DIR_LOCAL_APP_DATA` are in its blocklist as `kBlockAllChildren`
+([source](https://chromium.googlesource.com/chromium/src/+/main/chrome/browser/file_system_access/chrome_file_system_access_permission_context.cc)),
+and the picker answers *"Can't open this folder because it contains system files."* That is
+precisely where Palworld keeps Steam and Game Pass saves, so live sync is unavailable to
+most Windows players no matter which button they press.
+
+| Where the save lives | Opening it | Follows autosaves |
 |---|---|---|
-| Chrome, Edge, Opera | "Choose save folder" (File System Access API) | **Yes** — polls the folder every 5s, re-parses on change |
-| Chrome, Edge, Opera | Drag-drop or "Browse instead" | No — press Reload, or reopen as a folder |
-| Firefox, Safari | Drag-drop or folder picker | No — the picked files are a snapshot; press Reload |
+| `%LOCALAPPDATA%\Pal\...` (Steam, Windows) | upload / drag-drop | No — Chrome blocks the folder API here |
+| `%LOCALAPPDATA%\Packages\...` (Game Pass) | upload / drag-drop | No — same block |
+| Dedicated server directory | "Open as a live folder" | **Yes** |
+| `~/.steam/...` (Linux / Proton) | "Open as a live folder" | **Yes** — home is not blocklisted |
+| Anywhere, on Firefox or Safari | upload / drag-drop | No — no File System Access API |
 
-Polling checks only `Level.sav`'s mtime, so a quiet world costs one stat call every few
-seconds rather than a 32 MB reparse.
+So the landing page leads with the plain upload button, which uses an ordinary OS dialog and
+works everywhere, and offers the live folder as a clearly-labelled secondary option. Uploads
+are a snapshot; press Reload to pick up newer saves.
 
 ---
 

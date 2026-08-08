@@ -52,7 +52,10 @@ export function SettingsPage() {
     : needsReconnect
       ? 'Showing the copy stored in this browser. Reconnect the folder to pick up new autosaves.'
       : canOpenDirectory
-        ? 'This save was uploaded, so it cannot change. Use “Open another” and choose the folder to follow it live.'
+        ? // Chrome blocks the File System Access API for everything under
+          // AppData, which is where Palworld keeps Steam saves — so this is
+          // unavailable to most Windows players however they open the save.
+          'This save was uploaded, so it cannot change on its own. Following live needs a save folder outside AppData, which Chrome refuses to open — dedicated servers and Linux qualify, a normal Windows save does not.'
         : 'Needs a browser that can open a folder — Chrome, Edge or Opera. Elsewhere, use Reload.'
 
   const d = snapshot?.diagnostics
